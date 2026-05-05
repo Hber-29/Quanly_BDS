@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { User, Lock, Mail, Phone, MapPin, Calendar, UserCheck, ChevronRight, Heart } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Register = () => {
     const [formData, setFormData] = useState({
@@ -89,6 +90,10 @@ const Register = () => {
                     </div>
                     <button type="submit" style={styles.btn}>Xác nhận đăng ký <ChevronRight size={18} /></button>
                 </form>
+                <div style={styles.footer}>
+                    Bạn đã có tài khoản?{' '}
+                    <Link to="/login" style={styles.link}>Đăng nhập ngay</Link>
+                </div>
             </div>
         </div>
     );
@@ -104,7 +109,22 @@ const styles = {
     inputBox: { display: 'flex', alignItems: 'center', backgroundColor: '#f8f9fa', border: '1px solid #ced4da', borderRadius: '8px', padding: '10px 15px', marginBottom: '15px' },
     input: { border: 'none', background: 'none', outline: 'none', marginLeft: '10px', width: '100%', fontSize: '15px' },
     btn: { width: '100%', padding: '15px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '10px' },
-    alert: { padding: '15px', borderRadius: '8px', marginBottom: '25px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }
+    alert: { padding: '15px', borderRadius: '8px', marginBottom: '25px', textAlign: 'center', fontSize: '14px', fontWeight: '500' },
+    footer: {
+        textAlign: 'center',
+        marginTop: '20px',
+        fontSize: '14px',
+        color: '#666'
+    },
+    link: {
+        color: '#007bff',
+        textDecoration: 'none',
+        fontWeight: 'bold'
+    }
 };
 
 export default Register;
+
+
+
+
