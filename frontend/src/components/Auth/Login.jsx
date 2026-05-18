@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, ChevronRight } from 'lucide-react';
-import axios from 'axios';
+import authApi from '../../api/authApi'; // Import tầng API mới
 
 const Login = () => {
     const [credentials, setCredentials] = useState({ username: '', password: '' });
-    // Thêm state để quản lý thông báo hiển thị lên màn hình
     const [status, setStatus] = useState({ type: '', msg: '' });
     const navigate = useNavigate();
 
@@ -17,31 +16,31 @@ const Login = () => {
         e.preventDefault();
         setStatus({ type: 'info', msg: 'Đang kết nối đến hệ thống...' });
 
-        // Sử dụng URLSearchParams để tương thích hoàn hảo với request.getParameter() của Java Servlet
         const params = new URLSearchParams();
         params.append('username', credentials.username);
         params.append('password', credentials.password);
 
         try {
-            // Gọi qua API Gateway (Kong) ở cổng 8000
-            const response = await axios.post('http://localhost:8000/api/account/login', params, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
+            // Dùng qua authApi tập trung đã cấu hình interceptor
+            const data = await authApi.login(params);
 
-            if (response.status === 200) {
-                setStatus({ type: 'success', msg: 'Đăng nhập thành công! Đang chuyển hướng...' });
-                
-                // Lưu Token vào LocalStorage để dùng cho các request sau này
-                localStorage.setItem('token', response.data.token);
-                
-                // Giả lập chuyển hướng sau 1.5 giây
-                setTimeout(() => {
-                    navigate('/dashboard'); // Chuyển sang trang quản lý sau này
-                }, 1500);
-            }
+            setStatus({ type: 'success', msg: 'Đăng nhập thành công! Đang chuyển hướng...' });
+            
+            // axiosClient đã cắt sẵn data, ta chỉ việc bốc dùng
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('roleId', data.roleId); // Lưu thêm roleId để phân quyền giao diện
+            
+            setTimeout(() => {
+                // Tùy theo roleId để điều hướng cho chuẩn
+                if (data.roleId === 1 || data.roleId === 2) {
+                    navigate('/dashboard'); // Admin/Staff vào trang quản trị
+                } else {
+                    navigate('/'); // Customer về trang chủ client
+                }
+            }, 1500);
         } catch (error) {
-            // Hiển thị lỗi từ Backend hoặc Gateway
-            const errorMsg = error.response?.data?.message || 'Sai tên đăng nhập hoặc lỗi kết nối Gateway!';
+            // Lấy error message từ bộ chặn interceptor trả ra
+            const errorMsg = error.response?.data?.message || 'Sai tên đăng nhập hoặc lỗi kết nối hệ thống!';
             setStatus({ type: 'error', msg: errorMsg });
         }
     };
@@ -52,7 +51,6 @@ const Login = () => {
                 <h2 style={styles.title}>Chào Mừng Trở Lại</h2>
                 <p style={styles.subtitle}>Đăng nhập để quản lý bất động sản của bạn</p>
 
-                {/* KHU VỰC HIỂN THỊ THÔNG BÁO (ALERTS) */}
                 {status.msg && (
                     <div style={{
                         ...styles.alert,
@@ -94,7 +92,6 @@ const styles = {
     btn: { width: '100%', padding: '12px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' },
     footer: { textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' },
     link: { color: '#007bff', textDecoration: 'none', fontWeight: 'bold' },
-    // Style cho phần thông báo
     alert: { padding: '12px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }
 };
 

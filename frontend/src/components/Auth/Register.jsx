@@ -1,23 +1,24 @@
 import { useState } from 'react';
-import axios from 'axios';
+import { useNavigate, Link } from 'react-router-dom';
 import { User, Lock, Mail, Phone, MapPin, Calendar, UserCheck, ChevronRight, Heart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import authApi from '../../api/authApi'; // Import tầng API mới
 
 const Register = () => {
     const [formData, setFormData] = useState({
         username: '',
         password: '',
-        roleId: '3', // Mặc định là 3 (CUSTOMER) cho chuẩn RBAC
+        roleId: '3', // Mặc định là 3 (CUSTOMER)
         fullName: '',
         gender: '1',
         dob: '',
         phone: '',
         email: '',
         address: '',
-        preferences: '' // Thêm trường preferences để khớp BE
+        preferences: ''
     });
 
     const [status, setStatus] = useState({ type: '', msg: '' });
+    const navigate = useNavigate();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,22 +28,21 @@ const Register = () => {
         e.preventDefault();
         setStatus({ type: 'info', msg: 'Đang kết nối hệ thống phân tán...' });
 
-        // Chuyển đổi sang URLSearchParams để gửi dạng x-www-form-urlencoded (khớp Servlet)
         const params = new URLSearchParams();
         Object.keys(formData).forEach(key => params.append(key, formData[key]));
 
         try {
-            // URL cập nhật theo domain mới của bạn
-            const response = await axios.post('http://localhost:8000/api/account/register', params, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
-
-            if (response.status === 201) {
-                setStatus({ type: 'success', msg: 'Chúc mừng! Đăng ký tài khoản thành công.' });
-            }
+            // Chuyển sang gọi hàm của authApi trung tâm
+            await authApi.register(params);
+            
+            setStatus({ type: 'success', msg: 'Chúc mừng! Đăng ký thành công. Đang chuyển về trang đăng nhập...' });
+            
+            // Đăng ký xong tự động đá sang màn hình Login sau 2 giây
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
         } catch (error) {
-            // Hiển thị thông báo lỗi chi tiết từ Backend trả về
-            const errorServer = error.response?.data?.message || 'Lỗi kết nối (Kiểm tra Tomcat & CORS)!';
+            const errorServer = error.response?.data?.message || 'Lỗi hệ thống hoặc trùng tên đăng nhập!';
             setStatus({ type: 'error', msg: errorServer });
         }
     };
@@ -110,21 +110,8 @@ const styles = {
     input: { border: 'none', background: 'none', outline: 'none', marginLeft: '10px', width: '100%', fontSize: '15px' },
     btn: { width: '100%', padding: '15px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '10px' },
     alert: { padding: '15px', borderRadius: '8px', marginBottom: '25px', textAlign: 'center', fontSize: '14px', fontWeight: '500' },
-    footer: {
-        textAlign: 'center',
-        marginTop: '20px',
-        fontSize: '14px',
-        color: '#666'
-    },
-    link: {
-        color: '#007bff',
-        textDecoration: 'none',
-        fontWeight: 'bold'
-    }
+    footer: { textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' },
+    link: { color: '#007bff', textDecoration: 'none', fontWeight: 'bold' }
 };
 
 export default Register;
-
-
-
-
