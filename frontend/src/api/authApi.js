@@ -1,17 +1,18 @@
 import axiosClient from './axiosClient';
 
 const authApi = {
-    login: (credentials) => {
-        return axiosClient.post('/api/auth/login', credentials); // Endpoint qua Kong
+    // Đăng nhập: Đẩy dữ liệu dưới dạng x-www-form-urlencoded
+    login: (params) => {
+        return axiosClient.post('/api/account/login', params, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
     },
-    register: (userData) => {
-        return axiosClient.post('/api/auth/register', userData);
-    },
-    getProfile: () => {
-        return axiosClient.get('/api/account/profile'); // Hàm lấy profile dựa theo Role đã làm ở BE
-    },
-    updateProfile: (profileData) => {
-        return axiosClient.put('/api/account/profile', profileData); // Hàm cập nhật profile
+
+    // Đăng ký: Đẩy dữ liệu dưới dạng x-www-form-urlencoded
+    register: (params) => {
+        return axiosClient.post('/api/account/register', params, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
     }
 };
 

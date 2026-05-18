@@ -3,22 +3,40 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
+import DashboardPage from './pages/Dashboard/DashboardPage';
+import PropertySalePage from './pages/PropertySalePage';
+
+// Component Bảo vệ: Nếu đã đăng nhập (có token), cấm vào Login/Register
+const PublicRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    return <Navigate to="/" replace />; // Đá về trang chủ công khai
+  }
+  return children;
+};
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Lượt xem công khai cho khách vãng lai */}
+        {/* Các tuyến đường công khai công cộng */}
         <Route path="/" element={<HomePage />} />
-        
-        {/* Phân hệ Xác thực */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* Phân hệ Người dùng đã đăng nhập (Hồ sơ cá nhân) */}
+        <Route path="/nha-dat-ban" element={<PropertySalePage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         
-        {/* Tự động chuyển hướng nếu gõ sai đường dẫn */}
+        {/* Áp dụng PublicRoute bảo vệ cho Login và Register */}
+        <Route path="/login" element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        } />
+        <Route path="/register" element={
+          <PublicRoute>
+            <Register />
+          </PublicRoute>
+        } />
+        
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
