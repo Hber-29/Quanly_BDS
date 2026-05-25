@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { Search, MapPin, Building, Heart, User, LogOut } from 'lucide-react';
 import propertyApi from '../api/propertyApi';
 
@@ -7,11 +7,13 @@ const PropertySalePage = () => {
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isVerifiedOnly, setIsVerifiedOnly] = useState(false);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false); // Dropdown state
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
     const location = useLocation();
-    const navigate = useNavigate();
-    const token = localStorage.getItem('token'); // Check đăng nhập
+    
+    // ĐỒNG BỘ SỬA LOGIC TRẠNG THÁI LOGIN TẠI ĐÂY
+    const rawToken = localStorage.getItem('token');
+    const isLoggedIn = rawToken && rawToken !== 'null' && rawToken !== 'undefined' && rawToken.trim() !== '';
     
     const queryParams = new URLSearchParams(location.search);
     const keywordParam = queryParams.get('keyword') || '';
@@ -43,7 +45,7 @@ const PropertySalePage = () => {
             } catch {
                 const mockSaleData = [
                     { id: 1, propertyCode: 'OCP-3161', title: 'DEAL TỐT - TỰ LẬP ÁNH DƯƠNG 120M TẠI VINHOME OCEAN PARK 3 GIÁ TỐT NHẤT THỊ TRƯỜNG CHỈ 16,1 TY', priceDisplay: '16,1 tỷ', area: '120', address: 'Hưng Yên', thumbnail: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=60', description: 'Giá tốt hiếm có - Tự lập Ánh Dương AD12-XX Vin Ocean Park 3...', badge: 'VIP' },
-                    { id: 2, propertyCode: 'DN-0512', title: 'XÁC THỰC Gấp bán căn góc 3 phòng ngủ - 97,5 m2 thông thuỷ Sunshine City vị trí đắc địa', priceDisplay: '9,3 tỷ', area: '97.5', address: 'Bắc Từ Liêm, Hà Nội', thumbnail: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=60', description: 'Gia đình cần tiền bán gấp căn góc view siêu thoáng...', badge: 'XÁC THỰC' }
+                    { id: 2, propertyCode: 'DN-0512', title: 'XÁC THỰC Gấp bán căn góc 3 phòng ngủ - 97,5 m2 thông thuỷ Sunshine City vị trí đắc địa', priceDisplay: '9,3 tỷ', area: '97.5', address: 'Bắc Từ Liêm, Hà Nội', thumbnail: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=60', description: 'Giaeline cần tiền bán gấp căn góc view siêu thoáng...', badge: 'XÁC THỰC' }
                 ];
                 setProperties(mockSaleData);
             } finally {
@@ -68,13 +70,12 @@ const PropertySalePage = () => {
         const isConfirm = window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống BĐS 2026 không?");
         if (isConfirm) {
             localStorage.clear();
-            navigate('/login');
+            window.location.reload();
         }
     };
 
     return (
         <div style={styles.page}>
-            {/* HEADER ĐỒNG BỘ TRANG HOME */}
             <header style={styles.header}>
                 <div style={styles.headerFlexContainer}>
                     <div style={styles.leftNavGroup}>
@@ -100,7 +101,7 @@ const PropertySalePage = () => {
                     </div>
                     
                     <div style={styles.rightActionGroup}>
-                        {!token ? (
+                        {!isLoggedIn ? (
                             <>
                                 <Link to="/login" style={styles.authLink}>Đăng nhập</Link>
                                 <span style={{ color: '#ccc' }}>|</span>
@@ -226,16 +227,13 @@ const styles = {
     navLinkActive: { textDecoration: 'none', color: '#2c2c2c', fontWeight: '600', fontSize: '15px', padding: '10px 0', borderBottom: '2px solid #e03c31' },
     rightActionGroup: { display: 'flex', alignItems: 'center', gap: '15px' },
     authLink: { textDecoration: 'none', color: '#2c2c2c', fontSize: '15px', fontWeight: '600' },
-    
-    // Dropdown styles đồng bộ
     profileWrapper: { position: 'relative', padding: '10px 0', cursor: 'pointer' },
     profileTrigger: { display: 'flex', alignItems: 'center', gap: '8px' },
-    avatarCircle: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    avatarCircle: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#e03c31', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     profileText: { fontSize: '15px', fontWeight: '600', color: '#2c2c2c' },
     dropdownMenu: { position: 'absolute', top: '45px', right: 0, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', width: '180px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', overflow: 'hidden', zIndex: 110, display: 'flex', flexDirection: 'column', padding: '6px 0' },
     dropdownItem: { display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: '14px', color: '#334155', textDecoration: 'none', cursor: 'pointer' },
     dropdownDivider: { height: '1px', backgroundColor: '#e2e8f0', margin: '4px 0' },
-
     filterBarWrapper: { borderBottom: '1px solid #eee', backgroundColor: '#fcfcfc', padding: '12px 0' },
     filterBar: { maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', gap: '12px', alignItems: 'center' },
     searchContainer: { display: 'flex', alignItems: 'center', border: '1px solid #ddd', borderRadius: '4px', padding: '0 10px', backgroundColor: '#fff', flex: 1 },

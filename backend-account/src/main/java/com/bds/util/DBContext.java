@@ -10,11 +10,11 @@ public class DBContext {
     private static final String USER = "postgres";
     private static final String PASS = "postgres";
 
-    // URL kết nối trực tiếp đến Master (Cổng 5431) để GHI dữ liệu (Đăng ký)
-    private static final String WRITE_URL = "jdbc:postgresql://localhost:5431/real_estate";
+    // ĐÃ SỬA: Thay real_estate thành bds_account (Cổng 5431 - Master)
+    private static final String WRITE_URL = "jdbc:postgresql://localhost:5431/bds_account";
 
-    // URL kết nối đến Nginx Load Balancer (Cổng 5433) để ĐỌC dữ liệu (Kiểm tra trùng lặp)
-    private static final String READ_URL = "jdbc:postgresql://localhost:5433/real_estate";
+    // ĐÃ SỬA: Thay real_estate thành bds_account (Cổng 5433 - Nginx LB)
+    private static final String READ_URL = "jdbc:postgresql://localhost:5433/bds_account";
 
     /**
      * Kết nối dùng để GHI dữ liệu (INSERT, UPDATE, DELETE)

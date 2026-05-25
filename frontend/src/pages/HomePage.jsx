@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Search, MapPin, Building, Heart, User, LogOut } from 'lucide-react';
 import propertyApi from '../api/propertyApi';
 
@@ -7,10 +7,13 @@ const HomePage = () => {
     const [latestProperties, setLatestProperties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchKeyword, setSearchKeyword] = useState('');
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false); // Quản lý xòe dropdown profile
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
-    const navigate = useNavigate();
-    const token = localStorage.getItem('token'); // Kiểm tra trạng thái đăng nhập
+    
+    
+    // SỬA LOGIC TẠI ĐÂY: Kiểm tra chặt chẽ, tránh nuốt phải chuỗi rỗng hoặc null/undefined
+    const rawToken = localStorage.getItem('token');
+    const isLoggedIn = rawToken && rawToken !== 'null' && rawToken !== 'undefined' && rawToken.trim() !== '';
 
     const menus = [
         { name: 'Nhà đất bán', path: '/nha-dat-ban', isReady: true },
@@ -53,12 +56,11 @@ const HomePage = () => {
         }
     };
 
-    // Hàm xử lý đăng xuất có hiển thị hộp thoại confirm xác nhận
     const handleLogout = () => {
         const isConfirm = window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống BĐS 2026 không?");
         if (isConfirm) {
-            localStorage.clear(); // Xóa sạch token và roleId
-            navigate('/login'); // Đẩy về login
+            localStorage.clear(); // Xóa sạch dữ liệu trong kho lưu trữ
+            window.location.reload(); // Refresh lại trang để cập nhật ngay lập tức giao diện sang trạng thái Guest
         }
     };
 
@@ -88,20 +90,18 @@ const HomePage = () => {
                         </nav>
                     </div>
 
-                    {/* KHU VỰC THAY ĐỔI THEO TRẠNG THÁI ĐĂNG NHẬP */}
                     <div style={styles.rightActionGroup}>
                         <span style={styles.utilityText} onClick={() => alert('Tính năng đang được phát triển!')}>Yêu thích</span>
                         <span style={styles.divider}>|</span>
 
-                        {!token ? (
-                            // CHƯA ĐĂNG NHẬP: Hiện nút nguyên bản của bạn
+                        {/* KIỂM TRA TRẠNG THÁI ĐÃ LOGIN HAY CHƯA ĐỂ ĐỔI GIAO DIỆN HEADER */}
+                        {!isLoggedIn ? (
                             <>
                                 <Link to="/login" style={styles.authLink}>Đăng nhập</Link>
                                 <span style={styles.divider}>/</span>
                                 <Link to="/register" style={styles.authLink}>Đăng ký</Link>
                             </>
                         ) : (
-                            // ĐÃ ĐĂNG NHẬP: Ẩn đăng nhập/đăng ký, Hiện khối Dropdown di chuột (Hover/Click) chuyên nghiệp
                             <div 
                                 style={styles.profileWrapper}
                                 onMouseEnter={() => setIsDropdownOpen(true)}
@@ -129,7 +129,7 @@ const HomePage = () => {
                                 )}
                             </div>
                         )}
-                        <Link to={token ? "/dashboard" : "/login"} style={styles.postButton}>Đăng tin</Link>
+                        <Link to={isLoggedIn ? "/dashboard" : "/login"} style={styles.postButton}>Đăng tin</Link>
                     </div>
                 </div>
             </header>
@@ -217,16 +217,13 @@ const styles = {
     authLink: { textDecoration: 'none', color: '#2c2c2c', fontSize: '15px', fontWeight: '600' },
     divider: { color: '#e2e8f0', fontWeight: 'bold', fontSize: '14px' },
     postButton: { textDecoration: 'none', border: '2px solid #2c2c2c', color: '#2c2c2c', padding: '8px 18px', borderRadius: '6px', fontSize: '15px', fontWeight: '700', marginLeft: '12px', backgroundColor: '#fff' },
-    
-    // CSS HOVER DROPDOWN PROFILE CHUẨN DESIGN SYSTEM
     profileWrapper: { position: 'relative', padding: '10px 0', cursor: 'pointer' },
     profileTrigger: { display: 'flex', alignItems: 'center', gap: '8px' },
-    avatarCircle: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#64748b', display: 'flex', alignItems: 'center', justifyHeight: 'center', justifyContent: 'center' },
+    avatarCircle: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#e03c31', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     profileText: { fontSize: '15px', fontWeight: '600', color: '#2c2c2c' },
     dropdownMenu: { position: 'absolute', top: '45px', right: 0, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', width: '180px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', overflow: 'hidden', zIndex: 110, display: 'flex', flexDirection: 'column', padding: '6px 0' },
     dropdownItem: { display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: '14px', color: '#334155', textDecoration: 'none', cursor: 'pointer', transition: 'background-color 0.15s' },
     dropdownDivider: { height: '1px', backgroundColor: '#e2e8f0', margin: '4px 0' },
-
     hero: { height: '380px', backgroundImage: 'url(https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&w=1920&q=80)', backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     heroContent: { width: '100%', maxWidth: '720px', padding: '0 20px' },
     tabContainer: { display: 'flex', marginBottom: '0px' },

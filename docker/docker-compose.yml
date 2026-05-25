@@ -1,3 +1,4 @@
+
 version: '3.8'
 
 services:
@@ -65,34 +66,103 @@ services:
       - bds-network
 
   # --- CỤM HÀNG ĐỢI (KAFKA & ZOOKEEPER) ---
-    # 5. ZOOKEEPER
   zookeeper:
-      image: confluentinc/cp-zookeeper:7.5.0
-      container_name: bds-zookeeper
-      environment:
-        ZOOKEEPER_CLIENT_PORT: 2181
-        ZOOKEEPER_TICK_TIME: 2000
-      networks:
-        - bds-network
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: bds-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - bds-network
 
-    # 6. KAFKA BROKER
   kafka:
-      image: confluentinc/cp-kafka:7.5.0
-      container_name: bds-kafka
-      ports:
-        - "9092:9092"
-      depends_on:
-        - zookeeper
-      environment:
-        KAFKA_BROKER_ID: 1
-        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-        KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-        KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      networks:
-        - bds-network
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: bds-kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - bds-network
 
+  # --- CỤM GIÁM SÁT ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bds_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
+    networks:
+      - bds-network
+
+  # --- CỤM CACHING ---
+  redis:
+    image: redis:alpine
+    container_name: bds_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - bds-network
+
+  # --- CỤM LƯU TRỮ FILE/ẢNH ---
+  minio:
+    image: minio/minio
+    container_name: bds_minio
+    ports:
+      - "9000:9000" # Cổng API cho Backend gọi
+      - "9001:9001" # Cổng giao diện Web quản lý
+    environment:
+      MINIO_ROOT_USER: "admin"
+      MINIO_ROOT_PASSWORD: "minio_password123"
+    volumes:
+      - ./minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    networks:
+      - bds-network
+
+  # --- MÀN HÌNH GIÁM SÁT ---
+  grafana:
+    image: grafana/grafana:latest
+    container_name: bds_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # Mật khẩu đăng nhập Web Grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - bds-network
+
+  # --- CỤM TỰ ĐỘNG BACKUP DATABASE ---
+  postgres_backup:
+    image: prodrigestivill/postgres-backup-local
+    container_name: bds_pg_backup
+    environment:
+      - POSTGRES_HOST=db-master # Trỏ đúng vào tên service Master của bạn
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=bds_account,bds_property,bds_booking # Sao lưu cả 3 database mới
+      - SCHEDULE=@daily # Tự động chạy hàng ngày
+      - BACKUP_KEEP_DAYS=7 # Giữ lại bản backup trong 7 ngày
+    volumes:
+      - ./pg_backups:/backups
+    depends_on:
+      - db-master
+    restart: unless-stopped
+    networks:
+      - bds-network
 networks:
   bds-network:
     driver: bridge
