@@ -1,6 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // =========================================================================
+// IMPORT THƯ VIỆN CSS (BOOTSTRAP) ĐỂ HIỂN THỊ GIAO DIỆN ĐẸP
+// =========================================================================
+import 'bootstrap/dist/css/bootstrap.min.css';
+
+// =========================================================================
 // IMPORT COMPONENTS & PAGES
 // =========================================================================
 import Login from './components/Auth/Login';
@@ -11,10 +16,18 @@ import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
 
 // =========================================================================
+// HÀM KIỂM TRA TOKEN AN TOÀN TUYỆT ĐỐI
+// =========================================================================
+const checkAuth = () => {
+  const token = localStorage.getItem('token');
+  return token && token !== 'null' && token !== 'undefined' && token.trim() !== '';
+};
+
+// =========================================================================
 // GUARD 1: PUBLIC ROUTE (Chỉ dành cho Khách chưa đăng nhập)
 // =========================================================================
 const PublicRoute = ({ children }) => {
-  const isAuthenticated = Boolean(localStorage.getItem('token'));
+  const isAuthenticated = checkAuth();
   return isAuthenticated ? <Navigate to="/" replace /> : children;
 };
 
@@ -22,7 +35,7 @@ const PublicRoute = ({ children }) => {
 // GUARD 2: PRIVATE ROUTE (Bắt buộc phải đăng nhập)
 // =========================================================================
 const PrivateRoute = ({ children }) => {
-  const isAuthenticated = Boolean(localStorage.getItem('token'));
+  const isAuthenticated = checkAuth();
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 

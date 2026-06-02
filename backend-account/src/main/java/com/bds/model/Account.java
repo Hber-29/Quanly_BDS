@@ -9,6 +9,7 @@ public class Account {
     private int roleId; // Cập nhật: Dùng roleId (int) thay vì String role
     private boolean isActive;
     private Timestamp createdAt;
+    private String accountCode;
 
     public Account() {}
 
@@ -58,5 +59,13 @@ public class Account {
 
     public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getAccountCode() {
+        return accountCode;
+    }
+
+    public void setAccountCode(String accountCode) {
+        this.accountCode = accountCode;
     }
 }

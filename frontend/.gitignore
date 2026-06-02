@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+docker/minio_data/
+docker/pg_master_data/
+docker/pg_replica_data/
+
+target/
+node_modules/

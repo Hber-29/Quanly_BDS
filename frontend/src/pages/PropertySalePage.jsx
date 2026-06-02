@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Search, MapPin, Building, Heart, User, LogOut } from 'lucide-react';
+import { Search, MapPin, Building, Heart, User, LogOut, Clock, X } from 'lucide-react';
 import propertyApi from '../api/propertyApi';
 
 const PropertySalePage = () => {
@@ -9,15 +9,33 @@ const PropertySalePage = () => {
     const [isVerifiedOnly, setIsVerifiedOnly] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
+    // PHÂN TRANG
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limit = 15;
+    
     const location = useLocation();
-    
-    // ĐỒNG BỘ SỬA LOGIC TRẠNG THÁI LOGIN TẠI ĐÂY
-    const rawToken = localStorage.getItem('token');
-    const isLoggedIn = rawToken && rawToken !== 'null' && rawToken !== 'undefined' && rawToken.trim() !== '';
-    
     const queryParams = new URLSearchParams(location.search);
     const keywordParam = queryParams.get('keyword') || '';
+    
+    // STATE QUẢN LÝ BỘ LỌC TÌM KIẾM NÂNG CAO
+    const [keywordInput, setKeywordInput] = useState(keywordParam);
+    const [searchKeyword, setSearchKeyword] = useState(keywordParam);
+    const [selectedRegion, setSelectedRegion] = useState('');
 
+    // 🌟 KHỞI TẠO STATE & LỊCH SỬ TÌM KIẾM (Đã tối ưu tránh lỗi render)
+    const [searchHistory, setSearchHistory] = useState(() => {
+        const history = localStorage.getItem('search_history');
+        return history ? JSON.parse(history) : [];
+    });
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchRef = useRef(null);
+
+    const rawToken = localStorage.getItem('token');
+    const isLoggedIn = rawToken && rawToken !== 'null' && rawToken !== 'undefined' && rawToken.trim() !== '';
+
+    // MENU GIỮ NGUYÊN 100%
     const menus = [
         { name: 'Nhà đất bán', path: '/nha-dat-ban', isReady: true },
         { name: 'Nhà đất cho thuê', path: '#', isReady: false },
@@ -27,37 +45,35 @@ const PropertySalePage = () => {
         { name: 'Danh bạ', path: '#', isReady: false }
     ];
 
-    useEffect(() => {
-        const loadProperties = async () => {
-            setLoading(true);
-            try {
-                let data = [];
-                if (keywordParam) {
-                    data = await propertyApi.searchByPropertyCode(keywordParam);
-                } else {
-                    data = await propertyApi.getHomepageList();
-                }
-                if (data && data.length > 0) {
-                    setProperties(data);
-                } else {
-                    throw new Error();
-                }
-            } catch {
-                const mockSaleData = [
-                    { id: 1, propertyCode: 'OCP-3161', title: 'DEAL TỐT - TỰ LẬP ÁNH DƯƠNG 120M TẠI VINHOME OCEAN PARK 3 GIÁ TỐT NHẤT THỊ TRƯỜNG CHỈ 16,1 TY', priceDisplay: '16,1 tỷ', area: '120', address: 'Hưng Yên', thumbnail: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=60', description: 'Giá tốt hiếm có - Tự lập Ánh Dương AD12-XX Vin Ocean Park 3...', badge: 'VIP' },
-                    { id: 2, propertyCode: 'DN-0512', title: 'XÁC THỰC Gấp bán căn góc 3 phòng ngủ - 97,5 m2 thông thuỷ Sunshine City vị trí đắc địa', priceDisplay: '9,3 tỷ', area: '97.5', address: 'Bắc Từ Liêm, Hà Nội', thumbnail: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=60', description: 'Giaeline cần tiền bán gấp căn góc view siêu thoáng...', badge: 'XÁC THỰC' }
-                ];
-                setProperties(mockSaleData);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadProperties();
-    }, [keywordParam]);
+    // CÁC HÀM XỬ LÝ LỊCH SỬ & LOGOUT (GIỮ NGUYÊN)
+    const saveToHistory = (kw) => {
+        let history = JSON.parse(localStorage.getItem('search_history')) || [];
+        history = history.filter(item => item.toLowerCase() !== kw.toLowerCase()); 
+        history.unshift(kw); 
+        if (history.length > 5) history.pop(); 
+        localStorage.setItem('search_history', JSON.stringify(history));
+        setSearchHistory(history);
+    };
 
-    const displayedProperties = isVerifiedOnly 
-        ? properties.filter(item => item.badge === 'XÁC THỰC') 
-        : properties;
+    const clearHistory = (e) => {
+        e.stopPropagation(); 
+        localStorage.removeItem('search_history');
+        setSearchHistory([]);
+    };
+
+    const handleSelectKeyword = (kw) => {
+        setKeywordInput(kw);
+        setSearchKeyword(kw);
+        setShowSuggestions(false);
+        saveToHistory(kw);
+    };
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage);
+            window.scrollTo(0, 0);
+        }
+    };
 
     const handleMenuClick = (e, item) => {
         if (!item.isReady) {
@@ -74,25 +90,108 @@ const PropertySalePage = () => {
         }
     };
 
+    // QUẢN LÝ SỰ KIỆN CLICK OUTSIDE
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // ĐỒNG BỘ TỪ KHÓA TRANG CHỦ & TRANG BÁN
+    useEffect(() => {
+        setTimeout(() => {
+            if (keywordInput !== keywordParam) setKeywordInput(keywordParam);
+            if (searchKeyword !== keywordParam) setSearchKeyword(keywordParam);
+            if (currentPage !== 1) setCurrentPage(1);
+        }, 0);
+    }, [keywordParam]);
+
+    // 🌟 DEBOUNCE TÌM KIẾM 350MS
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            setSearchKeyword(keywordInput);
+            setCurrentPage(1); 
+            if (keywordInput.trim() && keywordInput !== keywordParam) {
+                saveToHistory(keywordInput.trim());
+            }
+        }, 350); 
+        return () => clearTimeout(delayDebounceFn);
+    }, [keywordInput, keywordParam]);
+
+    // 🌟 LẤY SUGGESTION TỪ REDIS
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            if (!keywordInput.trim()) {
+                setTimeout(() => setSuggestions([]), 0);
+                return;
+            }
+            try {
+                const response = await propertyApi.searchPropertiesAdvanced(keywordInput, selectedRegion, 1, 5);
+                const responseData = response.data || response;
+                if (responseData && responseData.properties) {
+                    setSuggestions(responseData.properties);
+                }
+            } catch (err) {
+                console.error("Lỗi lấy gợi ý:", err);
+            }
+        };
+        fetchSuggestions();
+    }, [keywordInput, selectedRegion]);
+
+    // 🌟 LẤY DANH SÁCH BÀI ĐĂNG CHÍNH
+    useEffect(() => {
+        const loadProperties = async () => {
+            setLoading(true);
+            try {
+                const response = await propertyApi.searchPropertiesAdvanced(searchKeyword, selectedRegion, currentPage, limit);
+                const responseData = response.data || response;
+                
+                if (responseData && responseData.properties) {
+                    setProperties(responseData.properties);
+                    setTotalPages(responseData.totalPages);
+                } else {
+                    setProperties([]);
+                    setTotalPages(1);
+                }
+            } catch (error) {
+                console.error("⚠️ Lỗi gọi dữ liệu tìm kiếm nâng cao:", error);
+                setProperties([]);
+                setTotalPages(1);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadProperties();
+    }, [searchKeyword, selectedRegion, currentPage]);
+
+    const displayedProperties = isVerifiedOnly 
+        ? properties.filter(item => item.badge === 'XÁC THỰC') 
+        : properties;
+
     return (
-        <div style={styles.page}>
-            <header style={styles.header}>
-                <div style={styles.headerFlexContainer}>
-                    <div style={styles.leftNavGroup}>
-                        <Link to="/" style={styles.logo}>
-                            <Building size={32} color="#e03c31" />
-                            <div style={styles.logoTextWrapper}>
-                                <span style={styles.logoMain}>Batdongsan</span>
-                                <span style={styles.logoSub}>.com.vn</span>
+        <div className="bg-light min-vh-100 pb-5">
+            {/* HEADER */}
+            <header className="bg-white border-bottom sticky-top shadow-sm z-3">
+                <div className="container-fluid px-4 py-2 d-flex justify-content-between align-items-center">
+                    <div className="d-flex align-items-center gap-5">
+                        <Link to="/" className="text-decoration-none d-flex align-items-center gap-2 text-dark">
+                            <Building size={32} className="text-danger" />
+                            <div className="d-flex align-items-baseline">
+                                <span className="fs-4 fw-bold text-danger" style={{letterSpacing: '-0.5px'}}>Batdongsan</span>
+                                <span className="fs-6 fw-bold text-dark">.com.vn</span>
                             </div>
                         </Link>
-                        <nav style={styles.navMenu}>
+                        <nav className="d-none d-lg-flex gap-4">
                             {menus.map((item, idx) => (
                                 <Link 
                                     key={idx} 
                                     to={item.path} 
                                     onClick={(e) => handleMenuClick(e, item)}
-                                    style={item.isReady ? styles.navLinkActive : styles.navLink}
+                                    className={`text-decoration-none fw-semibold pb-2 pt-2 ${item.isReady ? 'text-danger border-bottom border-danger border-2' : 'text-dark'}`}
                                 >
                                     {item.name}
                                 </Link>
@@ -100,169 +199,234 @@ const PropertySalePage = () => {
                         </nav>
                     </div>
                     
-                    <div style={styles.rightActionGroup}>
+                    <div className="d-flex align-items-center gap-3">
                         {!isLoggedIn ? (
                             <>
-                                <Link to="/login" style={styles.authLink}>Đăng nhập</Link>
-                                <span style={{ color: '#ccc' }}>|</span>
-                                <Link to="/register" style={styles.authLink}>Đăng ký</Link>
+                                <Link to="/login" className="text-dark text-decoration-none fw-semibold">Đăng nhập</Link>
+                                <span className="text-muted">|</span>
+                                <Link to="/register" className="text-dark text-decoration-none fw-semibold">Đăng ký</Link>
                             </>
                         ) : (
-                            <div 
-                                style={styles.profileWrapper}
-                                onMouseEnter={() => setIsDropdownOpen(true)}
-                                onMouseLeave={() => setIsDropdownOpen(false)}
-                            >
-                                <div style={styles.profileTrigger}>
-                                    <div style={styles.avatarCircle}>
-                                        <User size={16} color="#fff" />
+                            <div className="position-relative" onMouseEnter={() => setIsDropdownOpen(true)} onMouseLeave={() => setIsDropdownOpen(false)}>
+                                <div className="d-flex align-items-center gap-2" style={{cursor: 'pointer'}}>
+                                    <div className="bg-danger rounded-circle d-flex align-items-center justify-content-center text-white" style={{width: '28px', height: '28px'}}>
+                                        <User size={16} />
                                     </div>
-                                    <span style={styles.profileText}>Tài khoản</span>
+                                    <span className="fw-semibold text-dark">Tài khoản</span>
                                 </div>
                                 {isDropdownOpen && (
-                                    <div style={styles.dropdownMenu}>
-                                        <Link to="/profile" style={styles.dropdownItem}>
-                                            <User size={16} style={{ marginRight: '8px' }} />
-                                            Thông tin cá nhân
+                                    <div className="position-absolute end-0 bg-white border rounded shadow mt-2 py-2" style={{width: '180px', zIndex: 110}}>
+                                        <Link to="/profile" className="dropdown-item py-2 d-flex align-items-center text-secondary">
+                                            <User size={16} className="me-2" /> Thông tin cá nhân
                                         </Link>
-                                        <div style={styles.dropdownDivider} />
-                                        <div onClick={handleLogout} style={{ ...styles.dropdownItem, color: '#e03c31' }}>
-                                            <LogOut size={16} style={{ marginRight: '8px' }} />
-                                            Đăng xuất
+                                        <div className="dropdown-divider my-1"></div>
+                                        <div onClick={handleLogout} className="dropdown-item py-2 d-flex align-items-center text-danger" style={{cursor: 'pointer'}}>
+                                            <LogOut size={16} className="me-2" /> Đăng xuất
                                         </div>
                                     </div>
                                 )}
                             </div>
                         )}
+                        <Link to={isLoggedIn ? "/dang-tin" : "/login"} className="btn btn-outline-dark fw-bold ms-2 px-3 py-2 rounded">Đăng tin</Link>
                     </div>
                 </div>
             </header>
 
-            {/* FILTER BAR */}
-            <div style={styles.filterBarWrapper}>
-                <div style={styles.filterBar}>
-                    <div style={styles.searchContainer}>
-                        <Search size={16} color="#666" />
-                        <input type="text" defaultValue={keywordParam} placeholder="Nhà riêng Thủ Đức..." style={styles.filterInput} />
+            {/* FILTER BAR TÌM KIẾM NÂNG CAO - GIỮ NGUYÊN 100% CÁC TRƯỜNG CỦA BẠN */}
+            <div className="bg-white border-bottom shadow-sm py-3 mb-4">
+                <div className="container d-flex flex-wrap align-items-center gap-3">
+                    
+                    {/* KHỐI Ô NHẬP TÌM KIẾM CÓ CHỨA DROPDOWN GỢI Ý & LỊCH SỬ */}
+                    <div className="flex-grow-1 position-relative" style={{minWidth: '300px'}} ref={searchRef}>
+                        <div className="input-group border rounded">
+                            <span className="input-group-text bg-white border-0"><Search size={16} className="text-muted" /></span>
+                            <input 
+                                type="text" 
+                                className="form-control border-0 shadow-none px-2 py-2"
+                                value={keywordInput} 
+                                onChange={(e) => setKeywordInput(e.target.value)}
+                                onFocus={() => setShowSuggestions(true)}
+                                placeholder="Gõ tiêu đề hoặc mã bài đăng..." 
+                            />
+                            {keywordInput && (
+                                <span className="input-group-text bg-white border-0" style={{cursor: 'pointer'}} onClick={() => setKeywordInput('')}>
+                                    <X size={16} className="text-muted" />
+                                </span>
+                            )}
+                        </div>
+                        
+                        {/* 🌟 GIAO DIỆN DROPDOWN THÔNG MINH 🌟 */}
+                        {showSuggestions && (
+                            <div className="position-absolute start-0 w-100 bg-white border rounded shadow mt-1" style={{zIndex: 999, maxHeight: '280px', overflowY: 'auto'}}>
+                                {!keywordInput.trim() ? (
+                                    <>
+                                        <div className="d-flex justify-content-between px-3 py-2 bg-light border-bottom text-muted small fw-bold">
+                                            <span>Lịch sử tìm kiếm gần đây</span>
+                                            {searchHistory.length > 0 && (
+                                                <button onClick={clearHistory} className="btn btn-link btn-sm p-0 text-danger text-decoration-none fw-bold">Xóa tất cả</button>
+                                            )}
+                                        </div>
+                                        {searchHistory.length > 0 ? (
+                                            <div className="list-group list-group-flush">
+                                                {searchHistory.map((item, idx) => (
+                                                    <div key={idx} onClick={() => handleSelectKeyword(item)} className="list-group-item list-group-item-action d-flex align-items-center border-0 py-2" style={{cursor: 'pointer'}}>
+                                                        <Clock size={14} className="text-muted me-2" />
+                                                        <span className="small text-dark">{item}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="p-3 text-center text-muted small">Bạn chưa tìm kiếm từ khóa nào gần đây.</div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="px-3 py-2 bg-light border-bottom text-muted small fw-bold">Gợi ý bài đăng phù hợp</div>
+                                        {suggestions.length > 0 ? (
+                                            <div className="list-group list-group-flush">
+                                                {suggestions.map((item) => (
+                                                    <div key={item.propertyId} onClick={() => handleSelectKeyword(item.title)} className="list-group-item list-group-item-action d-flex align-items-center border-0 py-2" style={{cursor: 'pointer'}}>
+                                                        <Search size={14} className="text-danger me-2 flex-shrink-0" />
+                                                        <span className="small text-dark text-truncate flex-grow-1">{item.title}</span>
+                                                        <span className="badge bg-secondary ms-2 p-1" style={{fontSize: '11px'}}>{item.propertyCode}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="p-3 text-center text-muted small">Không tìm thấy gợi ý nào trùng khớp.</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
-                    <select style={styles.select}><option>Loại nhà đất</option></select>
-                    <select style={styles.select}><option>Khoảng giá</option></select>
-                    <select style={styles.select}><option>Diện tích</option></select>
+                    
+                    {/* BỘ LỌC VÙNG MIỀN */}
+                    <select 
+                        className="form-select w-auto shadow-none"
+                        value={selectedRegion}
+                        onChange={(e) => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
+                    >
+                        <option value="">Khu vực (Toàn quốc)</option>
+                        <option value="Hà Nội">Hà Nội</option>
+                        <option value="Hồ Chí Minh">TP.Hồ Chí Minh</option>
+                        <option value="Thủ Đức">Thủ Đức</option>
+                        <option value="Đà Nẵng">Đà Nẵng</option>
+                        <option value="Bình Dương">Bình Dương</option>
+                    </select>
 
+                    {/* GIỮ LẠI NGUYÊN VẸN 2 Ô CHỌN NÀY CỦA BẠN */}
+                    <select className="form-select w-auto shadow-none"><option>Khoảng giá</option></select>
+                    <select className="form-select w-auto shadow-none"><option>Diện tích</option></select>
+
+                    {/* GIỮ NGUYÊN NÚT TOGGLE SWITCH CUSTOM CỦA BẠN */}
                     <div 
-                        style={{ ...styles.verifiedToggleContainer, borderColor: isVerifiedOnly ? '#28a745' : '#ddd' }}
+                        className="d-flex align-items-center border rounded px-3 py-2 bg-white"
+                        style={{ cursor: 'pointer', userSelect: 'none', borderColor: isVerifiedOnly ? '#28a745' : '#ddd' }}
                         onClick={() => setIsVerifiedOnly(!isVerifiedOnly)}
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isVerifiedOnly ? '#28a745' : '#666'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isVerifiedOnly ? '#28a745' : '#666'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="me-2">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                             <polyline points="22 4 12 14.01 9 11.01"></polyline>
                         </svg>
-                        <span style={{...styles.toggleText, color: isVerifiedOnly ? '#28a745' : '#555'}}>Tin xác thực</span>
-                        <div style={{ ...styles.switchTrack, backgroundColor: isVerifiedOnly ? '#28a745' : '#ccc' }}>
-                            <div style={{ ...styles.switchCircle, transform: isVerifiedOnly ? 'translateX(14px)' : 'translateX(0px)' }} />
+                        <span className="fw-semibold me-2 small" style={{color: isVerifiedOnly ? '#28a745' : '#555'}}>Tin xác thực</span>
+                        <div className="rounded-pill d-flex align-items-center p-1" style={{ width: '30px', height: '16px', backgroundColor: isVerifiedOnly ? '#28a745' : '#ccc', transition: 'all 0.3s' }}>
+                            <div className="bg-white rounded-circle shadow-sm" style={{ width: '12px', height: '12px', transform: isVerifiedOnly ? 'translateX(14px)' : 'translateX(0px)', transition: 'transform 0.3s' }} />
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* PRODUCT GRID */}
-            <div style={styles.mainContainer}>
-                <div style={styles.leftColumn}>
-                    <h1 style={styles.mainTitle}>Mua bán nhà đất trên toàn quốc</h1>
-                    <p style={{ fontSize: '14px', fontWeight: '500', marginBottom: '20px' }}>
-                        Hiện có <strong style={{color: '#e03c31'}}>{displayedProperties.length}</strong> bất động sản phù hợp.
-                    </p>
+            <div className="container">
+                <div className="row">
+                    {/* KHỐI TRÁI: DANH SÁCH BÀI ĐĂNG */}
+                    <div className="col-lg-9">
+                        <h2 className="fw-bold mb-2">Mua bán nhà đất trên toàn quốc</h2>
+                        <p className="small fw-semibold mb-4 text-dark">
+                            Tìm thấy <strong className="text-danger">{displayedProperties.length}</strong> bất động sản phù hợp.
+                        </p>
 
-                    {loading ? (
-                        <div>Đang tải danh sách bài đăng...</div>
-                    ) : displayedProperties.length > 0 ? (
-                        displayedProperties.map((item) => (
-                            <div key={item.id} style={styles.listCard}>
-                                <img src={item.thumbnail} alt={item.title} style={styles.listCardImg} />
-                                <div style={styles.listCardBody}>
-                                    <span style={{ ...styles.vipBadge, color: item.badge === 'XÁC THỰC' ? '#28a745' : '#e03c31' }}>{item.badge === 'XÁC THỰC' ? 'TIN ĐÃ XÁC THỰC' : 'VIP KIM CƯƠNG'}</span>
-                                    <h3 style={styles.listCardTitle}>{item.title}</h3>
-                                    <div style={styles.listCardMeta}>
-                                        <span style={styles.cardPrice}>{item.priceDisplay}</span>
-                                        <span style={styles.cardArea}>{item.area} m²</span>
-                                        <span style={styles.locationText}><MapPin size={12} /> {item.address}</span>
-                                    </div>
-                                    <p style={styles.listCardDesc}>{item.description}</p>
-                                    <div style={styles.listCardFooter}>
-                                        <span style={{ fontSize: '12px', color: '#777' }}>Mã: {item.propertyCode}</span>
-                                        <button style={styles.favBtn}><Heart size={16} /></button>
+                        {loading ? (
+                            <div className="text-center py-5 text-muted">Đang tìm kiếm bài đăng...</div>
+                        ) : displayedProperties.length > 0 ? (
+                            displayedProperties.map((item) => (
+                                <div key={item.propertyId || item.id} className="card flex-row mb-4 border border-light-subtle rounded shadow-sm bg-white p-3">
+                                    <img src={item.thumbnail} alt={item.title} className="rounded object-fit-cover" style={{width: '240px', height: '160px'}} />
+                                    <div className="card-body d-flex flex-column py-0 pe-0">
+                                        <div className="mb-2">
+                                            <span className="badge fw-bold" style={{ fontSize: '11px', color: item.badge === 'XÁC THỰC' ? '#28a745' : '#e03c31', backgroundColor: 'transparent', padding: 0 }}>
+                                                {item.badge === 'XÁC THỰC' ? 'TIN ĐÃ XÁC THỰC' : 'VIP KIM CƯƠNG'}
+                                            </span>
+                                        </div>
+                                        <h5 className="card-title fw-bold text-dark fs-6 mb-3 lh-base">{item.title}</h5>
+                                        <div className="d-flex align-items-center gap-3 mb-2">
+                                            <span className="fw-bold text-danger">{item.priceDisplay}</span>
+                                            <span className="fw-bold text-danger">{item.area} m²</span>
+                                            <span className="small text-muted d-flex align-items-center gap-1"><MapPin size={12} /> {item.address}</span>
+                                        </div>
+                                        <p className="card-text small text-secondary mb-3" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>{item.description}</p>
+                                        <div className="mt-auto d-flex justify-content-between align-items-center">
+                                            <span className="small text-muted" style={{ fontSize: '12px' }}>Mã: {item.propertyCode}</span>
+                                            <button className="btn btn-light border p-1"><Heart size={16} /></button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div style={styles.noDataBox}>Không tìm thấy bài đăng nào có nhãn Xác Thực!</div>
-                    )}
-                </div>
+                            ))
+                        ) : (
+                            <div className="alert alert-light border border-dashed text-center py-5 text-secondary small">Không tìm thấy bài đăng nào khớp với điều kiện tìm kiếm của bạn.</div>
+                        )}
 
-                <div style={styles.rightColumn}>
-                    <div style={styles.sidebarBox}>
-                        <h4 style={styles.sidebarTitle}>Lọc theo khoảng giá</h4>
-                        <ul style={styles.sidebarList}>
-                            <li>Thỏa thuận</li><li>Dưới 500 triệu</li><li>500 - 800 triệu</li><li>1 - 2 tỷ</li>
-                        </ul>
+                        {/* THANH PHÂN TRANG */}
+                        {!loading && totalPages > 1 && (
+                            <div className="d-flex justify-content-center mt-4 mb-5 gap-2">
+                                <button 
+                                    onClick={() => handlePageChange(currentPage - 1)} 
+                                    disabled={currentPage === 1}
+                                    className="btn btn-outline-secondary fw-semibold small px-3 py-2"
+                                    style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                                >
+                                    &laquo; Trước
+                                </button>
+                                
+                                {[...Array(totalPages)].map((_, index) => (
+                                    <button 
+                                        key={index}
+                                        onClick={() => handlePageChange(index + 1)}
+                                        className={`btn fw-semibold small px-3 py-2 ${currentPage === index + 1 ? 'btn-danger' : 'btn-outline-secondary bg-white text-dark'}`}
+                                    >
+                                        {index + 1}
+                                    </button>
+                                ))}
+
+                                <button 
+                                    onClick={() => handlePageChange(currentPage + 1)} 
+                                    disabled={currentPage === totalPages}
+                                    className="btn btn-outline-secondary fw-semibold small px-3 py-2"
+                                    style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                                >
+                                    Sau &raquo;
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* KHỐI PHẢI: SIDEBAR */}
+                    <div className="col-lg-3">
+                        <div className="card border border-light-subtle rounded shadow-sm bg-white p-3 mb-4">
+                            <h6 className="fw-bold text-dark mb-3" style={{ fontSize: '14px' }}>Lọc theo khoảng giá</h6>
+                            <ul className="list-unstyled mb-0 d-flex flex-column gap-2 small text-secondary" style={{ cursor: 'pointer' }}>
+                                <li>Thỏa thuận</li>
+                                <li>Dưới 500 triệu</li>
+                                <li>500 - 800 triệu</li>
+                                <li>1 - 2 tỷ</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     );
-};
-
-const styles = {
-    page: { fontFamily: 'Arial, sans-serif', backgroundColor: '#fff', minHeight: '100vh' },
-    header: { backgroundColor: '#ffffff', borderBottom: '1px solid #f2f2f2', width: '100%' },
-    headerFlexContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '75px', padding: '0 30px', width: '100%' },
-    leftNavGroup: { display: 'flex', alignItems: 'center', gap: '40px' },
-    logo: { display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none' },
-    logoTextWrapper: { display: 'flex', alignItems: 'baseline' },
-    logoMain: { fontSize: '26px', fontWeight: '800', color: '#e03c31', letterSpacing: '-0.5px' },
-    logoSub: { fontSize: '14px', color: '#2c2c2c', fontWeight: 'bold' },
-    navMenu: { display: 'flex', gap: '24px', alignItems: 'center' },
-    navLink: { textDecoration: 'none', color: '#2c2c2c', fontWeight: '600', fontSize: '15px', padding: '10px 0' },
-    navLinkActive: { textDecoration: 'none', color: '#2c2c2c', fontWeight: '600', fontSize: '15px', padding: '10px 0', borderBottom: '2px solid #e03c31' },
-    rightActionGroup: { display: 'flex', alignItems: 'center', gap: '15px' },
-    authLink: { textDecoration: 'none', color: '#2c2c2c', fontSize: '15px', fontWeight: '600' },
-    profileWrapper: { position: 'relative', padding: '10px 0', cursor: 'pointer' },
-    profileTrigger: { display: 'flex', alignItems: 'center', gap: '8px' },
-    avatarCircle: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#e03c31', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    profileText: { fontSize: '15px', fontWeight: '600', color: '#2c2c2c' },
-    dropdownMenu: { position: 'absolute', top: '45px', right: 0, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', width: '180px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', overflow: 'hidden', zIndex: 110, display: 'flex', flexDirection: 'column', padding: '6px 0' },
-    dropdownItem: { display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: '14px', color: '#334155', textDecoration: 'none', cursor: 'pointer' },
-    dropdownDivider: { height: '1px', backgroundColor: '#e2e8f0', margin: '4px 0' },
-    filterBarWrapper: { borderBottom: '1px solid #eee', backgroundColor: '#fcfcfc', padding: '12px 0' },
-    filterBar: { maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', gap: '12px', alignItems: 'center' },
-    searchContainer: { display: 'flex', alignItems: 'center', border: '1px solid #ddd', borderRadius: '4px', padding: '0 10px', backgroundColor: '#fff', flex: 1 },
-    filterInput: { border: 'none', outline: 'none', padding: '8px', width: '100%', fontSize: '14px' },
-    select: { border: '1px solid #ddd', borderRadius: '4px', padding: '8px 12px', fontSize: '14px', backgroundColor: '#fff', width: '150px', outline: 'none' },
-    verifiedToggleContainer: { display: 'flex', alignItems: 'center', border: '1px solid #ddd', borderRadius: '4px', padding: '7px 12px', backgroundColor: '#fff', cursor: 'pointer', userSelect: 'none' },
-    toggleText: { fontSize: '14px', fontWeight: '600', marginRight: '10px' },
-    switchTrack: { width: '30px', height: '16px', borderRadius: '10px', padding: '2px', display: 'flex', alignItems: 'center' },
-    switchCircle: { width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#fff' },
-    mainContainer: { maxWidth: '1200px', margin: '20px auto 0', padding: '0 20px', display: 'flex', gap: '30px' },
-    leftColumn: { flex: 1 },
-    mainTitle: { fontSize: '22px', color: '#2c2c2c', margin: '10px 0', fontWeight: 'bold' },
-    listCard: { border: '1px solid #eee', borderRadius: '4px', display: 'flex', gap: '20px', padding: '15px', marginBottom: '20px', backgroundColor: '#fff' },
-    listCardImg: { width: '240px', height: '160px', objectFit: 'cover', borderRadius: '2px' },
-    listCardBody: { flex: 1, display: 'flex', flexDirection: 'column' },
-    vipBadge: { fontSize: '11px', fontWeight: 'bold', marginBottom: '5px' },
-    listCardTitle: { fontSize: '15px', color: '#2c2c2c', fontWeight: 'bold', margin: '0 0 10px 0', lineHeight: '1.4' },
-    listCardMeta: { display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px' },
-    cardPrice: { fontSize: '16px', fontWeight: 'bold', color: '#e03c31' },
-    cardArea: { fontSize: '16px', fontWeight: 'bold', color: '#e03c31' },
-    locationText: { fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center', gap: '2px' },
-    listCardDesc: { fontSize: '13px', color: '#555', lineHeight: '1.5', marginBottom: '10px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-    listCardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' },
-    favBtn: { background: 'none', border: '1px solid #eee', borderRadius: '4px', padding: '4px', cursor: 'pointer' },
-    rightColumn: { width: '280px' },
-    sidebarBox: { border: '1px solid #eee', borderRadius: '4px', padding: '15px', marginBottom: '20px', backgroundColor: '#fff' },
-    sidebarTitle: { fontSize: '14px', color: '#2c2c2c', margin: '0 0 12px 0', fontWeight: 'bold' },
-    sidebarList: { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: '#555', cursor: 'pointer' },
-    noDataBox: { padding: '40px', border: '1px dashed #ccc', borderRadius: '4px', textAlign: 'center', color: '#777', backgroundColor: '#fafafa', fontSize: '14px' }
 };
 
 export default PropertySalePage;

@@ -3,6 +3,7 @@ version: '3.8'
 
 services:
   # --- CỤM DATABASE MASTER-REPLICA ---
+  # --- CỤM DATABASE MASTER-REPLICA ---
   db-master:
     image: bitnami/postgresql:latest
     container_name: bds-db-master
@@ -14,9 +15,10 @@ services:
       - POSTGRESQL_REPLICATION_PASSWORD=repl_password
       - POSTGRESQL_USERNAME=postgres
       - POSTGRESQL_PASSWORD=postgres
-      - POSTGRESQL_DATABASE=real_estate
+      - POSTGRESQL_DATABASE=postgres # 🌟 Đã sửa thành postgres làm cửa chính
     volumes:
       - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./pg_master_data:/bitnami/postgresql # 🌟 KHIÊN BẢO VỆ DỮ LIỆU MASTER
     networks:
       - bds-network
 
@@ -35,6 +37,8 @@ services:
       - POSTGRESQL_MASTER_PORT_NUMBER=5432
       - POSTGRESQL_USERNAME=postgres
       - POSTGRESQL_PASSWORD=postgres
+    volumes:
+      - ./pg_replica_data:/bitnami/postgresql # 🌟 KHIÊN BẢO VỆ DỮ LIỆU REPLICA
     networks:
       - bds-network
 
