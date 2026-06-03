@@ -25,6 +25,7 @@ const Login = () => {
             const data = await authApi.login(params);
 
             setStatus({ type: 'success', msg: 'Đăng nhập thành công! Đang chuyển hướng...' });
+            localStorage.setItem('accountId', data.accountId); 
             
             // axiosClient đã cắt sẵn data, ta chỉ việc bốc dùng
             localStorage.setItem('token', data.token);

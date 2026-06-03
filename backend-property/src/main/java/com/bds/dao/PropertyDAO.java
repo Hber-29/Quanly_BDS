@@ -3,10 +3,7 @@ package com.bds.dao;
 import com.bds.model.Property;
 import com.bds.util.DBContext;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -156,5 +153,103 @@ public class PropertyDAO {
             e.printStackTrace();
         }
         return count;
+    }
+
+    /**
+     * Hàm lấy region_id dựa vào tên Tỉnh/Thành phố
+     */
+    public int getRegionIdByName(String provinceName) {
+        String sql = "SELECT region_id FROM region WHERE ? ILIKE '%' || region_name || '%' LIMIT 1";
+        try (Connection conn = DBContext.getReadConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, provinceName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt("region_id");
+            }
+        } catch (Exception e) {
+            System.out.println("⚠️ Lỗi dò region_id: " + e.getMessage());
+        }
+        return 1; // Trả về 1 (Hà Nội) nếu lỗi để tránh crash
+    }
+
+    public boolean insertPropertyWithImages(Property p, List<String> imageUrls) {
+        // 🔥 SỬA LỖI SQL: Thêm account_id vào danh sách cột và thêm một dấu ? vào VALUES
+        String insertPropertySql = "INSERT INTO property (property_uuid, property_code, title, description, price, area, address, thumbnail, category_id, region_id, account_id, created_at) " +
+                "VALUES (?::uuid, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING property_id";
+
+        String insertImageSql = "INSERT INTO property_image (property_id, image_url) VALUES (?, ?)";
+
+        String newUuid = java.util.UUID.randomUUID().toString();
+        String newCode = "CH-" + (int)(Math.random() * 9000 + 1000);
+        p.setPropertyUuid(newUuid);
+        p.setPropertyCode(newCode);
+
+        // Lấy ảnh đầu tiên làm thumbnail (nếu có)
+        String thumbnail = (imageUrls != null && !imageUrls.isEmpty()) ? imageUrls.get(0) : null;
+
+        Connection conn = null;
+        try {
+            conn = DBContext.getWriteConnection();
+            // Bắt đầu Transaction (Khái niệm cốt lõi trong hệ thống phân tán)
+            conn.setAutoCommit(false);
+
+            try (PreparedStatement psProp = conn.prepareStatement(insertPropertySql, Statement.RETURN_GENERATED_KEYS)) {
+                psProp.setString(1, p.getPropertyUuid());
+                psProp.setString(2, p.getPropertyCode());
+                psProp.setString(3, p.getTitle());
+                psProp.setString(4, p.getDescription());
+                psProp.setBigDecimal(5, p.getPrice());
+                psProp.setFloat(6, p.getArea());
+                psProp.setString(7, p.getAddress());
+                psProp.setString(8, thumbnail);
+                psProp.setInt(9, p.getCategoryId());
+                psProp.setInt(10, p.getRegionId());
+                psProp.setInt(11, p.getAccountId()); // 🔥 SỬA LỖI PARSE: Gán giá trị account_id vào dấu ? thứ 11
+
+                psProp.executeUpdate();
+
+                // Lấy ID của property vừa tạo để lưu vào bảng property_image
+                int generatedPropertyId = 0;
+                try (ResultSet rsKeys = psProp.getGeneratedKeys()) {
+                    if (rsKeys.next()) generatedPropertyId = rsKeys.getInt(1);
+                }
+
+                // Lưu các ảnh còn lại vào bảng property_image bằng kỹ thuật Batch Insert
+                if (imageUrls != null && imageUrls.size() > 1) {
+                    try (PreparedStatement psImg = conn.prepareStatement(insertImageSql)) {
+                        for (int i = 1; i < imageUrls.size(); i++) {
+                            psImg.setInt(1, generatedPropertyId);
+                            psImg.setString(2, imageUrls.get(i));
+                            psImg.addBatch(); // Gom lệnh để tối ưu hiệu suất network
+                        }
+                        psImg.executeBatch(); // Thực thi một lần
+                    }
+                }
+            }
+
+            // Hoàn tất Transaction
+            conn.commit();
+            return true;
+
+        } catch (Exception e) {
+            if (conn != null) {
+                try {
+                    conn.rollback(); // Nếu có lỗi (dù ở bảng property hay property_image), hủy bỏ toàn bộ
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close(); // Trả connection về Pool
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 }

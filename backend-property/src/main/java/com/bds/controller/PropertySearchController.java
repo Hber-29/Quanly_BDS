@@ -21,9 +21,9 @@ public class PropertySearchController extends HttpServlet {
         // 1. Cấu hình CORS để cho phép ReactJS (Front-end) gọi API mà không bị chặn
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+//        response.setHeader("Access-Control-Allow-Origin", "*");
+//        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+//        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
         // 2. Tiếp nhận các tham số tìm kiếm và phân trang từ URL gửi lên
         String keyword = request.getParameter("keyword");

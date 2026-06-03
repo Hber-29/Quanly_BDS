@@ -18,9 +18,9 @@ public class PropertyListController extends HttpServlet {
         // 1. Thiết lập CORS và tiếng Việt cho JSON
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+//        response.setHeader("Access-Control-Allow-Origin", "*");
+//        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+//        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
         // 2. Định nghĩa số trang mặc định nếu client không truyền lên
         int page = 1;

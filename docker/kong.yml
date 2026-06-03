@@ -38,6 +38,16 @@ services:
         paths:
           - /api/property
         strip_path: false
+  # 👇 THÊM ĐOẠN NÀY VÀO DƯỚI PROPERTY-SERVICE 👇
+      - name: categories-route
+        paths:
+          - /api/categories
+        strip_path: false
+  # Thêm route này để Kong chuyển tiếp yêu cầu upload
+      - name: upload-image-route
+        paths:
+          - /api/upload/image
+        strip_path: false
     plugins:
       - name: cors
         config:

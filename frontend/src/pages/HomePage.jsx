@@ -118,9 +118,15 @@ const HomePage = () => {
             setLoading(true);
             try {
                 const response = await propertyApi.getHomepageList();
-                if (response && response.properties && response.properties.length > 0) {
+                
+                // Thay vì kiểm tra length > 0, ta chỉ cần mảng properties tồn tại là đủ
+                // Nếu mảng rỗng (0 bài), giao diện sẽ tự động hiện "Chưa có bài đăng nào" chứ không báo lỗi.
+                if (response && Array.isArray(response.properties)) {
                     setLatestProperties(response.properties);
-                } else throw new Error();
+                } else {
+                    // Nếu backend trả về sai cấu trúc thì mới quăng lỗi
+                    throw new Error("Sai cấu trúc JSON"); 
+                }
             } catch (err) {
                 console.error("Lỗi lấy bài đăng trang chủ", err);
                 setLatestProperties([]);

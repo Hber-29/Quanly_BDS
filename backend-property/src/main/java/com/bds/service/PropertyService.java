@@ -115,4 +115,38 @@ public class PropertyService {
 
         return responseObj;
     }
+
+    /**
+     * Hàm xử lý nghiệp vụ Tạo bài đăng mới (Phiên bản lưu 2 bảng + Xóa Cache)
+     */
+    public boolean createProperty(Property newProperty, List<String> images) {
+        // 1. Validate dữ liệu cơ bản
+        if (newProperty.getTitle() == null || newProperty.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Tiêu đề không được để trống");
+        }
+        if (newProperty.getPrice().doubleValue() <= 0 || newProperty.getArea() <= 0) {
+            throw new IllegalArgumentException("Giá và Diện tích phải lớn hơn 0");
+        }
+
+        // 2. Gọi DAO để Insert xuống Database Master (Lưu cả bài đăng & ảnh)
+        boolean isSuccess = propertyDAO.insertPropertyWithImages(newProperty, images);
+
+        // 3. XÓA CACHE REDIS (Bước Cực Kỳ Quan Trọng)
+        if (isSuccess) {
+            try (Jedis jedis = new Jedis("localhost", 6379)) {
+                // Tìm tất cả các key lưu trữ danh sách và tìm kiếm
+                java.util.Set<String> keysToDelete = jedis.keys("properties_*");
+
+                if (keysToDelete != null && !keysToDelete.isEmpty()) {
+                    // Xóa hàng loạt cache cũ
+                    jedis.del(keysToDelete.toArray(new String[0]));
+                    System.out.println("🧹 Đã xóa " + keysToDelete.size() + " cache Redis để cập nhật dữ liệu mới!");
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️ Lỗi khi xóa Redis Cache: " + e.getMessage());
+            }
+        }
+
+        return isSuccess;
+    }
 }

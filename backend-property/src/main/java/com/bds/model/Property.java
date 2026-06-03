@@ -2,6 +2,7 @@ package com.bds.model;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.List;
 
 public class Property {
     private String propertyId;   // varchar(50)
@@ -16,7 +17,11 @@ public class Property {
     private String address;      // text (Đã sửa từ location)
     private String thumbnail;    // text (Chứa link ảnh MinIO)
     private String badge;        // varchar(50) (Chữ VIP)
-    private Timestamp createdAt; // timestamp
+    private Timestamp createdAt;
+    private int categoryId;
+    private int regionId;
+    private List<String> images;
+// Nhớ generate Getter và Setter cho 2 biến này nhé!// timestamp
 
     public Property() {
     }
@@ -65,5 +70,29 @@ public class Property {
 
     public void setPropertyUuid(String propertyUuid) {
         this.propertyUuid = propertyUuid;
+    }
+
+    public int getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(int categoryId) {
+        this.categoryId = categoryId;
+    }
+
+    public int getRegionId() {
+        return regionId;
+    }
+
+    public void setRegionId(int regionId) {
+        this.regionId = regionId;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
     }
 }
