@@ -9,7 +9,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 
@@ -25,46 +24,52 @@ public class BookingController extends HttpServlet {
         response.setContentType("application/json; charset=UTF-8");
 
         try {
-            // 1. Đọc dữ liệu JSON từ React / Postman gửi lên
             BufferedReader reader = request.getReader();
             JsonObject jsonReq = gson.fromJson(reader, JsonObject.class);
 
-            // 🌟 ĐÃ SỬA: Lấy kiểu số Nguyên (Int) thay vì String
             int propertyId = jsonReq.get("propertyId").getAsInt();
-
-            // 🌟 ĐÃ SỬA: Lấy accountId thay vì customerId
             int accountId = jsonReq.get("accountId").getAsInt();
 
-            // 2. Lưu vào Database với trạng thái 'PENDING_KAFKA'
             int bookingId = bookingDAO.createPendingBooking(propertyId, accountId);
 
             if (bookingId > 0) {
-                // 3. Đóng gói cái "Phong bì" để ném vào Kafka
                 JsonObject kafkaMessage = new JsonObject();
                 kafkaMessage.addProperty("bookingId", bookingId);
                 kafkaMessage.addProperty("propertyId", propertyId);
                 kafkaMessage.addProperty("accountId", accountId);
-                kafkaMessage.addProperty("timestamp", System.currentTimeMillis()); // Thời gian thực
+                kafkaMessage.addProperty("timestamp", System.currentTimeMillis());
 
-                // 4. Giao cho Producer ném lên Kafka
-                // 🌟 BÍ QUYẾT: Phải cộng thêm chuỗi rỗng ("") để biến propertyId thành String
-                // vì Kafka bắt buộc KEY phân luồng phải là kiểu String
                 BookingProducer.sendBookingMessage(propertyId + "", kafkaMessage.toString());
 
-                // 5. Trả lời ngay lập tức cho React để hiển thị thông báo
+                // 🌟 QUAN TRỌNG: Phải trả về "pending" và có bookingId
                 JsonObject res = new JsonObject();
-                res.addProperty("status", "success");
-                res.addProperty("message", "Yêu cầu đặt chỗ đã được đưa vào hàng đợi ưu tiên!");
+                res.addProperty("status", "pending");
+                res.addProperty("bookingId", bookingId);
+                res.addProperty("message", "Đang xử lý...");
                 response.getWriter().write(res.toString());
             } else {
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                response.getWriter().write("{\"status\":\"error\", \"message\":\"Lỗi ghi nhận Database\"}");
+                response.setStatus(500);
+                response.getWriter().write("{\"status\":\"error\", \"message\":\"Lỗi DB\"}");
             }
-
         } catch (Exception e) {
-            e.printStackTrace();
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            response.getWriter().write("{\"status\":\"error\", \"message\":\"Dữ liệu gửi lên không hợp lệ\"}");
+            response.setStatus(400);
+            response.getWriter().write("{\"status\":\"error\", \"message\":\"Dữ liệu sai\"}");
+        }
+    }
+
+    // 🌟 HÀM MỚI ĐỂ REACT GỌI HỎI THĂM TRẠNG THÁI
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("application/json; charset=UTF-8");
+        try {
+            int bookingId = Integer.parseInt(request.getParameter("bookingId"));
+            String status = bookingDAO.getBookingStatus(bookingId);
+
+            JsonObject res = new JsonObject();
+            res.addProperty("status", status); // Trả về PENDING_KAFKA, SUCCESS hoặc FAILED
+            response.getWriter().write(res.toString());
+        } catch (Exception e) {
+            response.setStatus(400);
         }
     }
 }

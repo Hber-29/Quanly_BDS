@@ -67,4 +67,39 @@ public class BookingRequestDAO {
             e.printStackTrace();
         }
     }
+
+    // Lấy trạng thái hiện tại của một đơn đặt chỗ
+    public String getBookingStatus(int bookingId) {
+        String sql = "SELECT status FROM booking_request WHERE booking_id = ?";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, bookingId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("status");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "UNKNOWN";
+    }
+
+    // 🌟 Kiểm tra xem nhà này đã có ai đặt thành công chưa, trả về accountId của người chiến thắng
+    public int getSuccessfulBookingAccountId(int propertyId) {
+        String sql = "SELECT account_id FROM booking_request WHERE property_id = ? AND status = 'SUCCESS'";
+        try (Connection conn = DBContext.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, propertyId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("account_id"); // Trả về ID của người đã mua được
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1; // Trả về -1 nếu chưa có ai mua
+    }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { MapPin, Clock, AlertTriangle, CheckCircle, ShieldCheck, Building, User, LogOut, X } from 'lucide-react';
@@ -11,7 +11,9 @@ const PropertyDetailPage = () => {
     const [property, setProperty] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeImage, setActiveImage] = useState(''); 
-    const [isBooking, setIsBooking] = useState(false);
+    
+    // 🌟 1. SỬ DỤNG bookingStatus ĐỂ QUẢN LÝ GIAO DIỆN NÚT BẤM
+    const [bookingStatus, setBookingStatus] = useState('IDLE'); // IDLE, POLLING, SUCCESS, FAILED
     
     // 🔴 STATE & LOGIC PHỤC VỤ CHO MENU HEADER ĐỒNG BỘ
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -42,25 +44,43 @@ const PropertyDetailPage = () => {
         }
     };
 
-
-
     useEffect(() => {
         const fetchPropertyDetail = async () => {
             try {
+                // 1. Lấy thông tin nhà từ Property Service
                 const res = await axiosClient.get(`/api/property/detail?id=${id}`);
                 
                 if (res && typeof res === 'object' && res.propertyId) {
                     setProperty(res);
                     if (res.images && res.images.length > 0) {
                         const validImages = res.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
-                        if (validImages.length > 0) {
-                            setActiveImage(validImages[0]);
-                        }
+                        if (validImages.length > 0) setActiveImage(validImages[0]);
                     }
                 } else {
-                    console.warn("⚠️ Response từ backend không hợp lệ:", res);
                     setProperty(null);
                 }
+
+                // 🌟 2. HỎI THĂM TRẠNG THÁI BOOKING NGAY KHI VỪA VÀO TRANG
+                try {
+                    const checkRes = await axiosClient.get(`/api/booking/check?propertyId=${id}`);
+                    const checkData = checkRes.data || checkRes;
+
+                    if (checkData.isBooked) {
+                        // Lấy ID người dùng hiện tại
+                        const storedAccountId = localStorage.getItem('accountId');
+                        const myAccountId = storedAccountId ? parseInt(storedAccountId, 10) : 1; 
+
+                        // Nếu ID chiến thắng trùng với ID của mình
+                        if (checkData.bookedByAccountId === myAccountId) {
+                            setBookingStatus('SUCCESS'); // Khóa nút Xanh
+                        } else {
+                            setBookingStatus('FAILED');  // Khóa nút Xám
+                        }
+                    }
+                } catch (bookingErr) {
+                    console.error("Lỗi khi kiểm tra trạng thái Booking:", bookingErr);
+                }
+
             } catch (err) {
                 console.error("Lỗi lấy dữ liệu chi tiết bài đăng:", err);
                 setProperty(null);
@@ -72,22 +92,18 @@ const PropertyDetailPage = () => {
         fetchPropertyDetail();
     }, [id]);
 
+    // 🌟 2. HÀM XỬ LÝ ĐẶT CHỖ VÀ CHỜ KẾT QUẢ KAFKA
     const handleBooking = async () => {
-        // 1. CHẶN NẾU CHƯA ĐĂNG NHẬP
         if (!isLoggedIn) {
             alert("Vui lòng đăng nhập để thực hiện chức năng đặt chỗ!");
             navigate('/login');
             return;
         }
 
-        setIsBooking(true);
+        setBookingStatus('POLLING'); // Đổi nút sang trạng thái đang xoay
 
         try {
-            // 2. CHUẨN BỊ DỮ LIỆU ĐÚNG KIỂU SỐ (INT)
             const propertyIdInt = parseInt(id, 10);
-            
-            // Lấy accountId từ LocalStorage (Giả sử khi Login bạn có lưu biến này)
-            // Nếu chưa làm phần Login lưu accountId, tạm để số 1 để test luồng Kafka
             const storedAccountId = localStorage.getItem('accountId');
             const accountIdInt = storedAccountId ? parseInt(storedAccountId, 10) : 1; 
 
@@ -96,21 +112,47 @@ const PropertyDetailPage = () => {
                 accountId: accountIdInt
             };
 
+            // Gọi API gửi yêu cầu vào hàng đợi
             const data = await axiosClient.post('/api/booking/request', requestBody);
 
-            // 4. XỬ LÝ KẾT QUẢ HIỂN THỊ CHO NGƯỜI DÙNG
-            if (data && data.status === 'success') {
-                alert(`🎉 ĐẶT CHỖ THÀNH CÔNG!\n\n${data.message}`);
-                // Có thể navigate người dùng sang trang "Lịch sử đặt chỗ" ở đây
+            if (data && (data.status === 'pending' || data.status === 'success')) {
+                const bookingId = data.bookingId;
+                if (!bookingId) {
+                    alert("Lỗi: Server không trả về Mã đặt chỗ (bookingId)!");
+                    setBookingStatus('IDLE');
+                    return;
+                }
+
+                // Vòng lặp hỏi thăm kết quả mỗi 1.5 giây
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await axiosClient.get(`/api/booking/request?bookingId=${bookingId}`);
+                        const currentStatus = statusRes.status || statusRes.data?.status;
+
+                        if (currentStatus === 'SUCCESS') {
+                            clearInterval(pollInterval);
+                            setBookingStatus('SUCCESS'); // Khóa nút, chuyển màu Xanh
+                            alert("🎉 ĐẶT CHỖ THÀNH CÔNG!\n\nBạn là người nhanh tay nhất chốt được căn nhà này!");
+                        } 
+                        else if (currentStatus === 'FAILED') {
+                            clearInterval(pollInterval);
+                            setBookingStatus('FAILED'); // Khóa nút, chuyển màu Xám
+                            alert("❌ RẤT TIẾC!\n\nCăn nhà này đã có người đặt cọc trước bạn 1 bước!");
+                        }
+                    } catch (e) {
+                        console.error("Lỗi khi hỏi thăm server:", e);
+                    }
+                }, 1500);
+
             } else {
-                alert(`❌ LỖI ĐẶT CHỖ: ${data.message || 'Hệ thống đang bận, vui lòng thử lại'}`);
+                setBookingStatus('IDLE');
+                alert(`❌ LỖI: ${data.message || 'Lỗi không xác định'}`);
             }
 
         } catch (error) {
+            setBookingStatus('IDLE');
             console.error("Lỗi khi gọi API Booking:", error);
             alert("❌ Không thể kết nối tới máy chủ Đặt chỗ. Vui lòng kiểm tra lại mạng!");
-        } finally {
-            setIsBooking(false);
         }
     };
 
@@ -127,12 +169,10 @@ const PropertyDetailPage = () => {
 
     return (
         <div className="bg-light min-vh-100 pb-5">
-            
-            {/* 🌟 ĐỒNG BỘ NGUYÊN VẸN HEADER TỪ TRANG PROPERTY-SALE-PAGE CỦA BẠN 🌟 */}
+            {/* HEADER */}
             <header className="bg-white border-bottom sticky-top shadow-sm z-3">
                 <div className="container-fluid px-4 py-2 d-flex justify-content-between align-items-center">
                     <div className="d-flex align-items-center gap-5">
-                        {/* Bấm vào Logo quay về trang chủ */}
                         <Link to="/" className="text-decoration-none d-flex align-items-center gap-2 text-dark">
                             <Building size={32} className="text-danger" />
                             <div className="d-flex align-items-baseline">
@@ -189,8 +229,6 @@ const PropertyDetailPage = () => {
 
             {/* THÂN TRANG CHI TIẾT */}
             <div className="container mt-4">
-                
-
                 <div className="row g-4">
                     <div className="col-lg-8">
                         {/* BỘ SƯU TẬP ẢNH */}
@@ -268,17 +306,28 @@ const PropertyDetailPage = () => {
                                     {formatArea(property.area)} m² • Giao dịch an toàn
                                 </p>
 
-                                <button 
-                                    onClick={handleBooking}
-                                    disabled={isBooking}
-                                    className="btn btn-danger w-100 py-3 rounded-3 fw-bold fs-5 shadow-sm d-flex justify-content-center align-items-center gap-2 mb-3 transition"
-                                >
-                                    {isBooking ? (
-                                        <><span className="spinner-border spinner-border-sm"></span> Đang đẩy vào hàng đợi...</>
-                                    ) : (
-                                        <><CheckCircle size={22}/> Yêu cầu tư vấn & Đặt giữ chỗ</>
-                                    )}
-                                </button>
+                                {/* 🌟 3. GIAO DIỆN NÚT BẤM DỰA VÀO TRẠNG THÁI */}
+                                {bookingStatus === 'SUCCESS' ? (
+                                    <button disabled className="btn btn-success w-100 py-3 rounded-3 fw-bold fs-5 shadow-sm d-flex justify-content-center align-items-center gap-2 mb-3">
+                                        <CheckCircle size={22}/> Đã đặt chỗ thành công
+                                    </button>
+                                ) : bookingStatus === 'FAILED' ? (
+                                    <button disabled className="btn btn-secondary w-100 py-3 rounded-3 fw-bold fs-5 shadow-sm d-flex justify-content-center align-items-center gap-2 mb-3">
+                                        <X size={22}/> Nhà đã có chủ
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={handleBooking}
+                                        disabled={bookingStatus === 'POLLING'}
+                                        className="btn btn-danger w-100 py-3 rounded-3 fw-bold fs-5 shadow-sm d-flex justify-content-center align-items-center gap-2 mb-3 transition"
+                                    >
+                                        {bookingStatus === 'POLLING' ? (
+                                            <><span className="spinner-border spinner-border-sm"></span> Đang chờ kết quả...</>
+                                        ) : (
+                                            <><CheckCircle size={22}/> Yêu cầu tư vấn & Đặt giữ chỗ</>
+                                        )}
+                                    </button>
+                                )}
 
                                 <p className="text-center text-muted small mb-0" style={{ fontSize: '12px' }}>
                                     <Clock size={14} className="me-1 d-inline mb-1" />
@@ -291,6 +340,6 @@ const PropertyDetailPage = () => {
             </div>
         </div>
     );
-
 };
+
 export default PropertyDetailPage;
