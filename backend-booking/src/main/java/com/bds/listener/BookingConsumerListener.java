@@ -75,9 +75,8 @@ public class BookingConsumerListener implements ServletContextListener {
             // Đọc JSON lấy thông tin
             JsonObject json = JsonParser.parseString(messageJson).getAsJsonObject();
             int bookingId = json.get("bookingId").getAsInt();
-
-            // 🌟 ĐÃ SỬA LỖI Ở ĐÂY: Lấy propertyId kiểu số Nguyên (Int) thay vì String
             int propertyId = json.get("propertyId").getAsInt();
+            int accountId = json.get("accountId").getAsInt(); // Bổ sung lấy accountId
 
             System.out.println("📦 [XỬ LÝ] Bóc phong bì Đặt chỗ ID: " + bookingId + " cho căn nhà: " + propertyId);
 
@@ -93,9 +92,28 @@ public class BookingConsumerListener implements ServletContextListener {
                 bookingDAO.updateBookingStatus(bookingId, "SUCCESS", "Thành công: Yêu cầu đặt chỗ hợp lệ.");
                 System.out.println("   ✅ Kết quả: THÀNH CÔNG (Người này nhanh tay nhất)");
 
-                // MỤC TIÊU 2 VÀ 3 (LÀM SAU):
-                // Tại vị trí này, sau này ta sẽ viết code để gọi API cập nhật trạng thái nhà
-                // sang backend_property và đẩy 1 tin nhắn vào Topic Gửi Email.
+                // 🌟 MỤC TIÊU 2: BẮN TIN NHẮN SANG BACKEND_PROPERTY ĐỂ ĐỔI THÀNH 'SOLD'
+                JsonObject syncMsg = new JsonObject();
+                syncMsg.addProperty("propertyId", propertyId);
+                syncMsg.addProperty("status", "SOLD");
+
+                // Gọi anh lính liên lạc để chạy đi báo tin nhà đã bán
+                com.bds.kafka.PropertyStatusProducer.sendStatusUpdate(String.valueOf(propertyId), syncMsg.toString());
+
+                // 🌟 MỤC TIÊU 3: BẮN TIN NHẮN VÀO HÀNG ĐỢI EMAIL ĐỂ GỬI THƯ BÁO TIN VUI
+                String[] customerInfo = bookingDAO.getCustomerInfo(accountId);
+                if (customerInfo != null && customerInfo[1] != null && !customerInfo[1].trim().isEmpty()) {
+                    JsonObject emailMsg = new JsonObject();
+                    emailMsg.addProperty("email", customerInfo[1]); // Email
+                    emailMsg.addProperty("name", customerInfo[0]);  // Tên
+                    emailMsg.addProperty("propertyId", propertyId + "");
+
+                    // Ném phong bì vào topic email-topic
+                    com.bds.kafka.EmailProducer.sendEmailTask(emailMsg.toString());
+                    System.out.println("   ✉️ [KAFKA SENDER] Đã ném lệnh gửi Email cho tài khoản " + accountId + " vào hàng đợi!");
+                } else {
+                    System.out.println("   ⚠️ [KAFKA SENDER] Không tìm thấy email của tài khoản " + accountId + " để gửi thông báo.");
+                }
             }
             System.out.println("---------------------------------------------------");
         } catch (Exception e) {

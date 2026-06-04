@@ -102,4 +102,25 @@ public class BookingRequestDAO {
         }
         return -1; // Trả về -1 nếu chưa có ai mua
     }
+
+    // Lấy thông tin khách hàng (Tên, Email) để gửi thư
+    public String[] getCustomerInfo(int accountId) {
+        // 🌟 ĐÃ SỬA: Tên bảng là customer_info (KHÔNG CÓ CHỮ 'R' Ở CUỐI)
+        String sql = "SELECT full_name, email FROM customer_info WHERE account_id = ?";
+
+        // 🌟 ĐÃ SỬA: Gọi đúng hàm kết nối sang DB Account
+        try (Connection conn = DBContext.getAccountDBConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, accountId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new String[]{rs.getString("full_name"), rs.getString("email")};
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }

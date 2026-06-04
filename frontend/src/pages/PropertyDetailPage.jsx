@@ -313,7 +313,7 @@ const PropertyDetailPage = () => {
                                     </button>
                                 ) : bookingStatus === 'FAILED' ? (
                                     <button disabled className="btn btn-secondary w-100 py-3 rounded-3 fw-bold fs-5 shadow-sm d-flex justify-content-center align-items-center gap-2 mb-3">
-                                        <X size={22}/> Nhà đã có chủ
+                                        <X size={22}/> Nhà đã được đặt
                                     </button>
                                 ) : (
                                     <button 

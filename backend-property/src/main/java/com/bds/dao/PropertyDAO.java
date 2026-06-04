@@ -306,5 +306,25 @@ public class PropertyDAO {
         return property;
     }
 
+    // Hàm cập nhật trạng thái nhà (Ví dụ: Chuyển từ AVAILABLE sang SOLD)
+    public void updatePropertyStatus(int propertyId, String newStatus) {
+        String sql = "UPDATE property SET status = ? WHERE property_id = ?";
+
+        // 🌟 ĐÃ SỬA: Dùng getWriteConnection() vì đây là thao tác Cập nhật (Ghi)
+        try (Connection conn = DBContext.getWriteConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, newStatus);
+            ps.setInt(2, propertyId);
+
+            int rowsAffected = ps.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("   💾 [DATABASE] Đã cập nhật căn nhà " + propertyId + " thành " + newStatus);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 
 }
