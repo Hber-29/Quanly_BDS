@@ -18,39 +18,40 @@ public class PropertySearchController extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // 1. Cấu hình CORS để cho phép ReactJS (Front-end) gọi API mà không bị chặn
+        // 1. Cấu hình định dạng tiếng Việt đầu ra cho JSON
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-//        response.setHeader("Access-Control-Allow-Origin", "*");
-//        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-//        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
         // 2. Tiếp nhận các tham số tìm kiếm và phân trang từ URL gửi lên
         String keyword = request.getParameter("keyword");
-        String region = request.getParameter("region");
+        String regionIdParam = request.getParameter("regionId"); // Đón nhận ID khu vực kiểu số nguyên
         String pageParam = request.getParameter("page");
         String limitParam = request.getParameter("limit");
 
         // Thiết lập giá trị phân trang mặc định an toàn
         int page = 1;
-        int limit = 15; // Mặc định trang kết quả tìm kiếm sẽ hiển thị tối đa 15 bài/trang
+        int limit = 15;
+        int regionId = 0; // Giá trị mặc định bằng 0 nghĩa là Tìm kiếm trên Toàn quốc
 
-        // 3. Kiểm tra và ép kiểu an toàn cho các tham số phân trang
+        // 3. Kiểm tra và ép kiểu dữ liệu an toàn cho các tham số đầu vào
         try {
+            if (regionIdParam != null && !regionIdParam.trim().isEmpty()) {
+                regionId = Integer.parseInt(regionIdParam);
+            }
             if (pageParam != null && !pageParam.trim().isEmpty()) {
                 page = Integer.parseInt(pageParam);
-                if (page < 1) page = 1; // Ngăn chặn phá hoại bằng số âm hoặc số 0
+                if (page < 1) page = 1;
             }
             if (limitParam != null && !limitParam.trim().isEmpty()) {
                 limit = Integer.parseInt(limitParam);
-                if (limit <= 0 || limit > 50) limit = 15; // Giới hạn tối đa 50 bài để bảo vệ DB
+                if (limit <= 0 || limit > 50) limit = 15;
             }
         } catch (NumberFormatException e) {
             System.out.println("⚠️ Tham số phân trang tìm kiếm không hợp lệ, hệ thống tự động dùng giá trị mặc định.");
         }
 
-        // 4. Gọi tầng não bộ Service (Nơi đã tích hợp cả luồng kiểm tra Redis Cache và DB Replica)
-        PropertyPageResponse result = propertyService.searchPropertyList(keyword, region, page, limit);
+        // 4. Chọc xuống tầng não bộ Service để xử lý tìm kiếm và điều phối luồng dữ liệu
+        PropertyPageResponse result = propertyService.searchPropertyList(keyword, regionId, page, limit);
 
         // 5. Chuyển đổi Object kết quả thành chuỗi JSON và bắn ngược về cho Front-end
         response.getWriter().write(gson.toJson(result));

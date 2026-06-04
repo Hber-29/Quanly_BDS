@@ -68,8 +68,14 @@ public class PropertyCreateController extends HttpServlet {
                 property.setAddress(jsonRequest.get("fullAddress").getAsString());
             }
 
-            // Tạm thời gán RegionID = 1 (Bạn có thể bổ sung logic map theo tỉnh thành sau)
-            property.setRegionId(1);
+            if (property.getAddress() != null && !property.getAddress().isEmpty()) {
+                com.bds.dao.PropertyDAO propertyDAO = new com.bds.dao.PropertyDAO();
+                int detectedRegionId = propertyDAO.getRegionIdByName(property.getAddress());
+                property.setRegionId(detectedRegionId);
+                System.out.println("📍 [HỆ THỐNG DIỄN GIẢI] Địa chỉ: " + property.getAddress() + " -> Khớp với Region ID: " + detectedRegionId);
+            } else {
+                property.setRegionId(1); // Mặc định là 1 nếu không có địa chỉ
+            }
 
             // 6. Trích xuất mảng link ảnh từ MinIO
             List<String> imageUrls = new ArrayList<>();

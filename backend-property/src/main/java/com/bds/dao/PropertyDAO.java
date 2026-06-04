@@ -71,29 +71,35 @@ public class PropertyDAO {
         return count;
     }
 
-    // 1. Hàm tìm kiếm bài đăng nâng cao có phân trang (Phục vụ cả tìm theo chữ và mã)
-    public List<Property> searchProperties(String keyword, String region, int page, int pageSize) {
+    // 🛠️ HÀM ĐÃ ĐƯỢC NÂNG CẤP: Tìm kiếm đa điều kiện Text + region_id số nguyên
+    // 1. Hàm tìm kiếm danh sách bài đăng (ĐÃ THÊM TÌM THEO ĐỊA CHỈ)
+    public List<Property> searchProperties(String keyword, Integer regionId, int page, int pageSize) {
         List<Property> list = new ArrayList<>();
-
-        // Chuẩn hóa dữ liệu tìm kiếm để đưa vào câu lệnh ILIKE (%từ_khóa%)
         String searchKeyword = (keyword != null) ? "%" + keyword.trim() + "%" : "%%";
-        String searchRegion = (region != null && !region.equals("Loại nhà đất") && !region.trim().isEmpty())
-                ? "%" + region.trim() + "%" : "%%";
 
-        // Câu lệnh SQL động: Tìm theo tiêu đề HOẶC mã bài đăng, và phải nằm trong khu vực/vùng được chọn
-        String sql = "SELECT * FROM property " +
-                "WHERE (title ILIKE ? OR property_code ILIKE ?) " +
-                "AND (address ILIKE ?) " +
-                "ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        // 🌟 NÂNG CẤP: Đã thêm 'OR address ILIKE ?' vào câu SQL
+        StringBuilder sql = new StringBuilder(
+                "SELECT * FROM property WHERE (title ILIKE ? OR property_code ILIKE ? OR address ILIKE ?) "
+        );
+
+        if (regionId != null && regionId > 0) {
+            sql.append("AND region_id = ? ");
+        }
+        sql.append("ORDER BY created_at DESC LIMIT ? OFFSET ?");
 
         try (Connection conn = DBContext.getReadConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
 
-            ps.setString(1, searchKeyword); // Khớp với title
-            ps.setString(2, searchKeyword); // Khớp với property_code
-            ps.setString(3, searchRegion);  // Khớp với vùng (quét trong cột address)
-            ps.setInt(4, pageSize);         // LIMIT số lượng bài (ví dụ: 15)
-            ps.setInt(5, (page - 1) * pageSize); // OFFSET vị trí bắt đầu lấy
+            int idx = 1;
+            ps.setString(idx++, searchKeyword); // Truyền cho title
+            ps.setString(idx++, searchKeyword); // Truyền cho property_code
+            ps.setString(idx++, searchKeyword); // 🌟 Truyền cho address (Dòng mới thêm)
+
+            if (regionId != null && regionId > 0) {
+                ps.setInt(idx++, regionId);
+            }
+            ps.setInt(idx++, pageSize);
+            ps.setInt(idx++, (page - 1) * pageSize);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -103,45 +109,45 @@ public class PropertyDAO {
                     p.setAccountId(rs.getInt("account_id"));
                     p.setTitle(rs.getString("title"));
                     p.setPrice(rs.getBigDecimal("price"));
-
-                    if (p.getPrice() != null) {
-                        p.setPriceDisplay(p.getPrice().toString() + " tỷ");
-                    }
-
+                    if (p.getPrice() != null) p.setPriceDisplay(p.getPrice().toString() + " tỷ");
                     p.setArea(rs.getFloat("area"));
                     p.setAddress(rs.getString("address"));
                     p.setThumbnail(rs.getString("thumbnail"));
-//                    p.setBadge(rs.getString("badge"));
                     p.setCreatedAt(rs.getTimestamp("created_at"));
-
                     list.add(p);
                 }
             }
         } catch (Exception e) {
-            System.out.println("Lỗi khi thực thi tìm kiếm bài đăng: " + e.getMessage());
             e.printStackTrace();
         }
         return list;
     }
 
-    // 2. Hàm đếm tổng số lượng bài đăng khớp với điều kiện tìm kiếm (Để tính tổng số trang)
-    public int getTotalSearchCount(String keyword, String region) {
+    // 2. Hàm đếm tổng số bài (ĐÃ THÊM TÌM THEO ĐỊA CHỈ)
+    public int getTotalSearchCount(String keyword, Integer regionId) {
         int count = 0;
-
         String searchKeyword = (keyword != null) ? "%" + keyword.trim() + "%" : "%%";
-        String searchRegion = (region != null && !region.equals("Loại nhà đất") && !region.trim().isEmpty())
-                ? "%" + region.trim() + "%" : "%%";
 
-        String sql = "SELECT COUNT(*) FROM property " +
-                "WHERE (title ILIKE ? OR property_code ILIKE ?) " +
-                "AND (address ILIKE ?)";
+        // 🌟 NÂNG CẤP TƯƠNG TỰ BÊN TRÊN
+        StringBuilder sql = new StringBuilder(
+                "SELECT COUNT(*) FROM property WHERE (title ILIKE ? OR property_code ILIKE ? OR address ILIKE ?) "
+        );
+
+        if (regionId != null && regionId > 0) {
+            sql.append("AND region_id = ?");
+        }
 
         try (Connection conn = DBContext.getReadConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
 
-            ps.setString(1, searchKeyword);
-            ps.setString(2, searchKeyword);
-            ps.setString(3, searchRegion);
+            int idx = 1;
+            ps.setString(idx++, searchKeyword);
+            ps.setString(idx++, searchKeyword);
+            ps.setString(idx++, searchKeyword); // 🌟 Dòng mới thêm
+
+            if (regionId != null && regionId > 0) {
+                ps.setInt(idx++, regionId);
+            }
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -149,7 +155,6 @@ public class PropertyDAO {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Lỗi khi đếm tổng số bài tìm kiếm: " + e.getMessage());
             e.printStackTrace();
         }
         return count;

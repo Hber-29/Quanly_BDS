@@ -11,9 +11,10 @@ const propertyApi = {
         return axiosClient.get(`/api/property/list?page=${page}&limit=${limit}`);
     },
 
-    // 🌟 3. HÀM MỚI: Kết nối API Tìm kiếm nâng cao đa tầng (Title, Mã, Vùng) tích hợp Redis Cache
-    searchPropertiesAdvanced: (keyword = '', region = '', page = 1, limit = 15) => {
-        return axiosClient.get(`/api/property/search?keyword=${encodeURIComponent(keyword)}&region=${encodeURIComponent(region)}&page=${page}&limit=${limit}`);
+    // 🌟 3. HÀM ĐÃ ĐƯỢC SỬA LỖI: Đổi chữ "region" thành "regionId"
+    searchPropertiesAdvanced: (keyword = '', regionId = '', page = 1, limit = 15) => {
+        // CHÚ Ý: Đường link đã được đổi thành &regionId=
+        return axiosClient.get(`/api/property/search?keyword=${encodeURIComponent(keyword)}&regionId=${encodeURIComponent(regionId)}&page=${page}&limit=${limit}`);
     },
 
     // 4. Tìm kiếm cũ (giữ nguyên dự phòng)
