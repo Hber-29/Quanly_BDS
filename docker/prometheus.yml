@@ -2,6 +2,25 @@ global:
   scrape_interval: 15s # Cứ 15 giây đi quét số liệu 1 lần
 
 scrape_configs:
+  # --- Job 1: Prometheus tự giám sát chính nó ---
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+
+  # --- Job 2: Giám sát máy chủ Java (Backend Property - Cổng 8082) ---
+  - job_name: 'backend-property'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8082']
+
+  # --- Job 3: Giám sát máy chủ Java (Backend Account - Cổng 8081) ---
+  - job_name: 'backend-account'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8081']
+
+  # --- Job 4: Giám sát máy chủ Java (Backend Booking - Cổng 8083) ---
+  - job_name: 'backend-booking'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8083']
