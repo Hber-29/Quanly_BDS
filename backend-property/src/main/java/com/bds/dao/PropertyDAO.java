@@ -252,4 +252,59 @@ public class PropertyDAO {
             }
         }
     }
+
+    // 🔥 Đã đổi tham số thành int
+    public Property getPropertyDetailById(int propertyId) {
+        Property property = null;
+        List<String> images = new ArrayList<>();
+
+        String sqlProperty = "SELECT property_id, title, description, price, area, address, thumbnail, category_id, region_id, account_id FROM property WHERE property_id = ?";
+        String sqlImages = "SELECT image_url FROM property_image WHERE property_id = ?";
+
+        try (Connection conn = DBContext.getWriteConnection()) {
+
+            try (PreparedStatement psProp = conn.prepareStatement(sqlProperty)) {
+                // 🔥 Đã đổi thành setInt
+                psProp.setInt(1, propertyId);
+                try (ResultSet rs = psProp.executeQuery()) {
+                    if (rs.next()) {
+                        property = new Property();
+                        // 🔥 Đã đổi thành getInt
+                        property.setPropertyId(String.valueOf(rs.getInt("property_id")));
+                        property.setTitle(rs.getString("title"));
+                        property.setDescription(rs.getString("description"));
+                        property.setPrice(rs.getBigDecimal("price"));
+                        property.setArea(rs.getFloat("area"));
+                        property.setAddress(rs.getString("address"));
+                        property.setThumbnail(rs.getString("thumbnail"));
+                        property.setCategoryId(rs.getInt("category_id"));
+                        property.setRegionId(rs.getInt("region_id"));
+                        property.setAccountId(rs.getInt("account_id"));
+
+                        if (property.getThumbnail() != null && !property.getThumbnail().isEmpty()) {
+                            images.add(property.getThumbnail());
+                        }
+                    }
+                }
+            }
+
+            if (property != null) {
+                try (PreparedStatement psImg = conn.prepareStatement(sqlImages)) {
+                    // 🔥 Đã đổi thành setInt
+                    psImg.setInt(1, propertyId);
+                    try (ResultSet rsImg = psImg.executeQuery()) {
+                        while (rsImg.next()) {
+                            images.add(rsImg.getString("image_url"));
+                        }
+                    }
+                }
+                property.setImages(images);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return property;
+    }
+
+
 }

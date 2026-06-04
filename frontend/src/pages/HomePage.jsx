@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Building, Heart, User, LogOut, Clock, X } from 'lucide-react';
 import propertyApi from '../api/propertyApi';
+import { formatPrice, formatArea, formatUnitPrice } from '../utils/formatPrice';
 
 const HomePage = () => {
     const [latestProperties, setLatestProperties] = useState([]);
@@ -168,11 +169,19 @@ const HomePage = () => {
                     <div className="d-flex align-items-center gap-5">
                         <Link to="/" className="text-decoration-none d-flex align-items-center gap-2 text-dark">
                             <Building size={32} className="text-danger" />
-                            <h4 className="mb-0 fw-bold text-danger">Batdongsan<span className="fs-6 text-dark">.com.vn</span></h4>
+                            <div className="d-flex align-items-baseline">
+                                <span className="fs-4 fw-bold text-danger" style={{letterSpacing: '-0.5px'}}>Batdongsan</span>
+                                <span className="fs-6 fw-bold text-dark">.com.vn</span>
+                            </div>
                         </Link>
                         <nav className="d-none d-lg-flex gap-4">
                             {menus.map((item, idx) => (
-                                <Link key={idx} to={item.path} onClick={(e) => handleMenuClick(e, item)} className="text-dark text-decoration-none fw-semibold">
+                                <Link 
+                                    key={idx} 
+                                    to={item.path} 
+                                    onClick={(e) => handleMenuClick(e, item)}
+                                    className={`text-decoration-none fw-semibold pb-2 pt-2 ${item.isReady ? 'text-danger border-bottom border-danger border-2' : 'text-dark'}`}
+                                >
                                     {item.name}
                                 </Link>
                             ))}
@@ -180,33 +189,34 @@ const HomePage = () => {
                     </div>
 
                     <div className="d-flex align-items-center gap-3">
-                        <span className="fw-semibold cursor-pointer d-none d-md-block" onClick={() => alert('Tính năng đang phát triển!')}>Yêu thích</span>
-                        <div className="vr d-none d-md-block"></div>
-
                         {!isLoggedIn ? (
                             <>
                                 <Link to="/login" className="text-dark text-decoration-none fw-semibold">Đăng nhập</Link>
-                                <span>/</span>
+                                <span className="text-muted">|</span>
                                 <Link to="/register" className="text-dark text-decoration-none fw-semibold">Đăng ký</Link>
                             </>
                         ) : (
                             <div className="position-relative" onMouseEnter={() => setIsDropdownOpen(true)} onMouseLeave={() => setIsDropdownOpen(false)}>
                                 <div className="d-flex align-items-center gap-2" style={{cursor: 'pointer'}}>
-                                    <div className="bg-danger rounded-circle d-flex align-items-center justify-content-center text-white" style={{width: 32, height: 32}}>
-                                        <User size={18} />
+                                    <div className="bg-danger rounded-circle d-flex align-items-center justify-content-center text-white" style={{width: '28px', height: '28px'}}>
+                                        <User size={16} />
                                     </div>
-                                    <span className="fw-semibold">Tài khoản</span>
+                                    <span className="fw-semibold text-dark">Tài khoản</span>
                                 </div>
                                 {isDropdownOpen && (
-                                    <div className="position-absolute end-0 bg-white border rounded shadow mt-2 py-2" style={{width: '200px', zIndex: 1000}}>
-                                        <Link to="/profile" className="dropdown-item py-2"><User size={16} className="me-2"/> Thông tin cá nhân</Link>
-                                        <hr className="my-1" />
-                                        <button onClick={handleLogout} className="dropdown-item py-2 text-danger"><LogOut size={16} className="me-2"/> Đăng xuất</button>
+                                    <div className="position-absolute end-0 bg-white border rounded shadow mt-2 py-2" style={{width: '180px', zIndex: 110}}>
+                                        <Link to="/profile" className="dropdown-item py-2 d-flex align-items-center text-secondary">
+                                            <User size={16} className="me-2" /> Thông tin cá nhân
+                                        </Link>
+                                        <div className="dropdown-divider my-1"></div>
+                                        <div onClick={handleLogout} className="dropdown-item py-2 d-flex align-items-center text-danger" style={{cursor: 'pointer'}}>
+                                            <LogOut size={16} className="me-2" /> Đăng xuất
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         )}
-                        <Link to={isLoggedIn ? "/dang-tin" : "/login"} className="btn btn-outline-dark fw-bold ms-2">Đăng tin</Link>
+                        <Link to={isLoggedIn ? "/dang-tin" : "/login"} className="btn btn-outline-dark fw-bold ms-2 px-3 py-2 rounded">Đăng tin</Link>
                     </div>
                 </div>
             </header>
@@ -294,26 +304,30 @@ const HomePage = () => {
                         <div className="row g-4">
                             {latestProperties.map((item) => (
                                 <div key={item.propertyId || item.id} className="col-xl-3 col-lg-4 col-md-6 col-sm-6">
-                                    <div className="card h-100 shadow-sm border-0 position-relative">
-                                        <div className="position-relative" style={{height: '180px'}}>
-                                            <img src={item.thumbnail} alt={item.title} className="card-img-top w-100 h-100" style={{objectFit: 'cover'}} />
-                                            <span className="badge bg-danger position-absolute top-0 start-0 m-2">{item.badge || 'VIP'}</span>
+                                    {/* 🔥 BƯỚC 1: Bọc Link quanh Card để biến nó thành nút bấm */}
+                                    <Link to={`/nha-dat-ban/${item.propertyId || item.id}`} className="text-decoration-none text-dark">
+                                        <div className="card h-100 shadow-sm border-0 position-relative" style={{ transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                                            <div className="position-relative" style={{height: '180px'}}>
+                                                <img src={item.thumbnail} alt={item.title} className="card-img-top w-100 h-100" style={{objectFit: 'cover'}} />
+                                                <span className="badge bg-danger position-absolute top-0 start-0 m-2">{item.badge || 'VIP'}</span>
+                                            </div>
+                                            <div className="card-body d-flex flex-column">
+                                                <h6 className="card-title text-truncate-2" style={{height: '40px', overflow: 'hidden'}}>{item.title}</h6>
+                                                <div className="d-flex gap-3 mb-2 align-items-center">
+                                                    <span className="text-danger fw-bold fs-6">{formatPrice(item.price)}</span>
+                                                    <span className="text-danger fw-bold small">{formatArea(item.area)} m²</span>
+                                                </div>
+                                                <div className="text-muted small mb-3 text-truncate">
+                                                    <MapPin size={14} className="me-1" />{item.address}
+                                                </div>
+                                                <div className="mt-auto d-flex justify-content-between align-items-center pt-3 border-top">
+                                                    <span className="text-muted small">Mã: {item.propertyCode}</span>
+                                                    {/* Ngăn chặn sự kiện click lan ra thẻ Link khi bấm nút trái tim */}
+                                                    <button className="btn btn-light btn-sm border" onClick={(e) => e.preventDefault()}><Heart size={16} className="text-muted" /></button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="card-body d-flex flex-column">
-                                            <h6 className="card-title text-truncate-2" style={{height: '40px', overflow: 'hidden'}}>{item.title}</h6>
-                                            <div className="d-flex gap-3 mb-2 align-items-center">
-                                                <span className="text-danger fw-bold fs-6">{item.priceDisplay}</span>
-                                                <span className="text-danger fw-bold small">{item.area} m²</span>
-                                            </div>
-                                            <div className="text-muted small mb-3 text-truncate">
-                                                <MapPin size={14} className="me-1" />{item.address}
-                                            </div>
-                                            <div className="mt-auto d-flex justify-content-between align-items-center pt-3 border-top">
-                                                <span className="text-muted small">Mã: {item.propertyCode}</span>
-                                                <button className="btn btn-light btn-sm border"><Heart size={16} className="text-muted" /></button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    </Link>
                                 </div>
                             ))}
                         </div>

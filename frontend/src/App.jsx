@@ -14,6 +14,8 @@ import HomePage from './pages/HomePage';
 import PropertySalePage from './pages/PropertySalePage';
 import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
+// 🔥 BƯỚC 1: BẮT BUỘC PHẢI IMPORT TRANG CHI TIẾT VÀO ĐÂY
+import PropertyDetailPage from './pages/PropertyDetailPage'; 
 
 // =========================================================================
 // HÀM KIỂM TRA TOKEN AN TOÀN TUYỆT ĐỐI
@@ -49,6 +51,10 @@ const App = () => {
         {/* 🟢 NHÓM 1: ROUTE CÔNG KHAI (Ai vào xem cũng được) */}
         <Route path="/" element={<HomePage />} />
         <Route path="/nha-dat-ban" element={<PropertySalePage />} />
+        
+        {/* 🔥 BƯỚC 2: THÊM ĐƯỜNG DẪN CHO TRANG CHI TIẾT BÀI ĐĂNG */}
+        {/* Dấu :id là tham số động, đại diện cho mã bất động sản (VD: CH-123) */}
+        <Route path="/nha-dat-ban/:id" element={<PropertyDetailPage />} />
 
         {/* 🟠 NHÓM 2: ROUTE AUTH (Xác thực tài khoản) */}
         <Route 

@@ -1,3 +1,27 @@
 docker/minio_data/
 docker/pg_master_data/
 docker/pg_replica_data/
+
+# ---------------------------------------------------
+# Bỏ qua các file biên dịch của Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Bỏ qua thư mục build của Maven/Tomcat
+target/
+*/target/
+.mvn/
+
+# Bỏ qua thư viện của ReactJS (Frontend)
+node_modules/
+dist/
+build/
+.env
+
+# Bỏ qua các file cấu hình tạm của phần mềm IDE (IntelliJ, VS Code)
+.idea/
+*.iml
+.vscode/
+.DS_Store

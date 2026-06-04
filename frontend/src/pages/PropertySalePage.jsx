@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Search, MapPin, Building, Heart, User, LogOut, Clock, X } from 'lucide-react';
 import propertyApi from '../api/propertyApi';
+import { formatPrice, formatArea, formatUnitPrice } from '../utils/formatPrice';
 
 const PropertySalePage = () => {
     const [properties, setProperties] = useState([]);
@@ -351,27 +352,31 @@ const PropertySalePage = () => {
                             <div className="text-center py-5 text-muted">Đang tìm kiếm bài đăng...</div>
                         ) : displayedProperties.length > 0 ? (
                             displayedProperties.map((item) => (
-                                <div key={item.propertyId || item.id} className="card flex-row mb-4 border border-light-subtle rounded shadow-sm bg-white p-3">
-                                    <img src={item.thumbnail} alt={item.title} className="rounded object-fit-cover" style={{width: '240px', height: '160px'}} />
-                                    <div className="card-body d-flex flex-column py-0 pe-0">
-                                        <div className="mb-2">
-                                            <span className="badge fw-bold" style={{ fontSize: '11px', color: item.badge === 'XÁC THỰC' ? '#28a745' : '#e03c31', backgroundColor: 'transparent', padding: 0 }}>
-                                                {item.badge === 'XÁC THỰC' ? 'TIN ĐÃ XÁC THỰC' : 'VIP KIM CƯƠNG'}
-                                            </span>
-                                        </div>
-                                        <h5 className="card-title fw-bold text-dark fs-6 mb-3 lh-base">{item.title}</h5>
-                                        <div className="d-flex align-items-center gap-3 mb-2">
-                                            <span className="fw-bold text-danger">{item.priceDisplay}</span>
-                                            <span className="fw-bold text-danger">{item.area} m²</span>
-                                            <span className="small text-muted d-flex align-items-center gap-1"><MapPin size={12} /> {item.address}</span>
-                                        </div>
-                                        <p className="card-text small text-secondary mb-3" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>{item.description}</p>
-                                        <div className="mt-auto d-flex justify-content-between align-items-center">
-                                            <span className="small text-muted" style={{ fontSize: '12px' }}>Mã: {item.propertyCode}</span>
-                                            <button className="btn btn-light border p-1"><Heart size={16} /></button>
+                                /* 🔥 BƯỚC 2: Bọc Link thay cho thẻ div bọc ngoài cùng */
+                                <Link to={`/nha-dat-ban/${item.propertyId || item.id}`} key={item.propertyId || item.id} className="text-decoration-none text-dark d-block mb-4">
+                                    <div className="card flex-row border border-light-subtle rounded shadow-sm bg-white p-3" style={{ transition: 'box-shadow 0.2s', cursor: 'pointer' }} onMouseOver={(e) => e.currentTarget.classList.add('shadow')} onMouseOut={(e) => e.currentTarget.classList.remove('shadow')}>
+                                        <img src={item.thumbnail} alt={item.title} className="rounded object-fit-cover" style={{width: '240px', height: '160px'}} />
+                                        <div className="card-body d-flex flex-column py-0 pe-0">
+                                            <div className="mb-2">
+                                                <span className="badge fw-bold" style={{ fontSize: '11px', color: item.badge === 'XÁC THỰC' ? '#28a745' : '#e03c31', backgroundColor: 'transparent', padding: 0 }}>
+                                                    {item.badge === 'XÁC THỰC' ? 'TIN ĐÃ XÁC THỰC' : 'VIP KIM CƯƠNG'}
+                                                </span>
+                                            </div>
+                                            <h5 className="card-title fw-bold text-dark fs-6 mb-3 lh-base">{item.title}</h5>
+                                            <div className="d-flex align-items-center gap-3 mb-2">
+                                                <span className="fw-bold text-danger">{formatPrice(item.price)}</span>
+                                                <span className="fw-bold text-danger">{formatArea(item.area)} m²</span>
+                                                <span className="small text-muted d-flex align-items-center gap-1"><MapPin size={12} /> {item.address}</span>
+                                            </div>
+                                            <p className="card-text small text-secondary mb-3" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>{item.description}</p>
+                                            <div className="mt-auto d-flex justify-content-between align-items-center">
+                                                <span className="small text-muted" style={{ fontSize: '12px' }}>Mã: {item.propertyCode}</span>
+                                                {/* Ngăn chặn sự kiện click lan ra thẻ Link khi bấm trái tim */}
+                                                <button className="btn btn-light border p-1" onClick={(e) => e.preventDefault()}><Heart size={16} /></button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                </Link>
                             ))
                         ) : (
                             <div className="alert alert-light border border-dashed text-center py-5 text-secondary small">Không tìm thấy bài đăng nào khớp với điều kiện tìm kiếm của bạn.</div>

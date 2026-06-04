@@ -1,15 +1,20 @@
 _format_version: "3.0"
 
 upstreams:
+  # Cụm Server cho Property (Chỉ để cổng 8082)
   - name: property-cluster
     targets:
       - target: host.docker.internal:8082
         weight: 100
+
+  # 🌟 TẠO RIÊNG Cụm Server cho Booking (Cổng 8083)
+  - name: booking-cluster
+    targets:
       - target: host.docker.internal:8083
         weight: 100
 
 services:
-  # Microservice 1: Account
+  # Microservice 1: Account (Giữ nguyên của bạn)
   - name: account-service
     url: http://host.docker.internal:8081
     routes:
@@ -17,7 +22,6 @@ services:
         paths:
           - /api/account
         strip_path: false
-    # Thêm CORS dạng rút gọn nhất
     plugins:
       - name: cors
         config:
@@ -31,22 +35,42 @@ services:
   # Microservice 2: Property
   - name: property-service
     host: property-cluster
-    path: /api/property
+    # ❌ TUYỆT ĐỐI KHÔNG KHAI BÁO 'path: /api/property' Ở ĐÂY NỮA
     protocol: http
     routes:
       - name: property-route
         paths:
           - /api/property
-        strip_path: false
-  # 👇 THÊM ĐOẠN NÀY VÀO DƯỚI PROPERTY-SERVICE 👇
+        strip_path: false   # 🌟 ĐỔI THÀNH FALSE
+
       - name: categories-route
         paths:
           - /api/categories
-        strip_path: false
-  # Thêm route này để Kong chuyển tiếp yêu cầu upload
+        strip_path: false   # 🌟 ĐỔI THÀNH FALSE
+
       - name: upload-image-route
         paths:
           - /api/upload/image
+        strip_path: false   # 🌟 ĐỔI THÀNH FALSE
+
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - http://localhost:5173
+          methods:
+            - GET
+            - POST
+            - OPTIONS
+
+  # 🌟 KẾT NỐI LUÔN MICROSERVICE 3: BOOKING
+  - name: booking-service
+    host: booking-cluster
+    protocol: http
+    routes:
+      - name: booking-route
+        paths:
+          - /api/booking
         strip_path: false
     plugins:
       - name: cors

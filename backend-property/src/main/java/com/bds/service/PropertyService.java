@@ -1,6 +1,7 @@
 package com.bds.service;
 
 import com.bds.dao.PropertyDAO;
+import com.bds.dto.ResponseDTO.PropertyDetailDTO;
 import com.bds.model.Property;
 import com.bds.dto.ResponseDTO.PropertyPageResponse;
 import com.bds.util.DBContext;
@@ -148,5 +149,25 @@ public class PropertyService {
         }
 
         return isSuccess;
+    }
+
+
+
+    // 🔥 Đổi tham số thành int
+    public PropertyDetailDTO getPropertyDetail(int propertyId) {
+        Property p = propertyDAO.getPropertyDetailById(propertyId);
+
+        if (p == null) return null;
+
+        PropertyDetailDTO dto = new PropertyDetailDTO();
+        dto.setPropertyId(Integer.parseInt(p.getPropertyId()));
+        dto.setTitle(p.getTitle());
+        dto.setDescription(p.getDescription());
+        dto.setPrice(p.getPrice());
+        dto.setArea(p.getArea());
+        dto.setAddress(p.getAddress());
+        dto.setImages(p.getImages());
+
+        return dto;
     }
 }
