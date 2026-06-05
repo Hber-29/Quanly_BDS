@@ -12,6 +12,7 @@ public class CustomerInfo {
     private String email;
     private String address;
     private String preferences; // Cập nhật: Thêm trường preferences
+    private String avatar;
 
     public CustomerInfo() {}
 
@@ -85,5 +86,13 @@ public class CustomerInfo {
 
     public void setPreferences(String preferences) {
         this.preferences = preferences;
+    }
+
+    public String getAvatar() {
+        return avatar;
+    }
+
+    public void setAvatar(String avatar) {
+        this.avatar = avatar;
     }
 }
