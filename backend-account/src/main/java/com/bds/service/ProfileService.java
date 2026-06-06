@@ -5,17 +5,15 @@ import com.bds.dao.StaffInfoDAO;
 import com.bds.model.CustomerInfo;
 import com.bds.model.StaffInfo;
 import com.bds.util.DBContext;
-import com.google.gson.Gson;
 import java.sql.Connection;
 
 public class ProfileService {
-    // Khởi tạo trực tiếp tại mục khai báo biến theo yêu cầu của bạn
+
     private CustomerInfoDAO customerDAO = new CustomerInfoDAO();
     private StaffInfoDAO staffDAO = new StaffInfoDAO();
-    private Gson gson = new Gson();
 
     /**
-     * Lấy dữ liệu hồ sơ dựa theo RoleId trích xuất từ Token
+     * Lấy dữ liệu hồ sơ dựa theo RoleId
      */
     public Object getProfileByRole(int accountId, int roleId) throws Exception {
         try (Connection conn = DBContext.getReadConnection()) {
@@ -28,16 +26,16 @@ public class ProfileService {
     }
 
     /**
-     * Cập nhật hồ sơ dựa theo RoleId
+     * 🔥 ĐÃ SỬA: Cập nhật hồ sơ nhận tham số là Object (Để hỗ trợ chức năng có Upload Ảnh Avatar)
      */
-    public boolean updateProfileByRole(int accountId, int roleId, String jsonBody) throws Exception {
+    public boolean updateProfileByRole(int accountId, int roleId, Object profileData) throws Exception {
         try (Connection conn = DBContext.getWriteConnection()) {
             if (roleId == 1 || roleId == 2) {
-                StaffInfo staff = gson.fromJson(jsonBody, StaffInfo.class);
+                StaffInfo staff = (StaffInfo) profileData;
                 staff.setAccountId(accountId); // Đảm bảo luôn dùng ID từ Token để bảo mật
                 return staffDAO.update(conn, staff);
             } else {
-                CustomerInfo customer = gson.fromJson(jsonBody, CustomerInfo.class);
+                CustomerInfo customer = (CustomerInfo) profileData;
                 customer.setAccountId(accountId);
                 return customerDAO.update(conn, customer);
             }

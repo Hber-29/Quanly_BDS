@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Building, Heart, User, LogOut, Clock, X } from 'lucide-react';
+
+// 🔥 Đã sửa thành ../ (Lùi 1 cấp vì HomePage nằm ở src/pages)
 import propertyApi from '../api/propertyApi';
 import { formatPrice, formatArea, formatUnitPrice } from '../utils/formatPrice';
+import ProfileModal from '../components/Customer/ProfileModal';
 
 const HomePage = () => {
     const [latestProperties, setLatestProperties] = useState([]);
@@ -10,7 +13,9 @@ const HomePage = () => {
     const [searchKeyword, setSearchKeyword] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
-    // 🌟 KHỞI TẠO LƯỜI BIẾNG BỘ NHỚ LỊCH SỬ (LAZY INIT)
+    // Cờ hiệu quản lý bật/tắt Popup Hồ sơ
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    
     const [searchHistory, setSearchHistory] = useState(() => {
         const history = localStorage.getItem('search_history');
         return history ? JSON.parse(history) : [];
@@ -33,7 +38,6 @@ const HomePage = () => {
         { name: 'Danh bạ', path: '#', isReady: false }
     ];
 
-    // 🌟 KHAI BÁO CÁC HÀM XỬ LÝ LÊN TRƯỚC USE-EFFECT ĐỂ TRÁNH LỖI HOISTING
     const saveToHistory = (kw) => {
         let history = JSON.parse(localStorage.getItem('search_history')) || [];
         history = history.filter(item => item.toLowerCase() !== kw.toLowerCase());
@@ -83,7 +87,6 @@ const HomePage = () => {
         }
     };
 
-    // CHỈ XỬ LÝ CLICK OUTSIDE Ở ĐÂY
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -94,7 +97,6 @@ const HomePage = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // GỌI Ý TÌM KIẾM (ĐÃ FIX LỖI EMPTY BLOCK & RENDER KÉP)
     useEffect(() => {
         if (!searchKeyword.trim()) {
             setTimeout(() => setSuggestions([]), 0);
@@ -119,13 +121,9 @@ const HomePage = () => {
             setLoading(true);
             try {
                 const response = await propertyApi.getHomepageList();
-                
-                // Thay vì kiểm tra length > 0, ta chỉ cần mảng properties tồn tại là đủ
-                // Nếu mảng rỗng (0 bài), giao diện sẽ tự động hiện "Chưa có bài đăng nào" chứ không báo lỗi.
                 if (response && Array.isArray(response.properties)) {
                     setLatestProperties(response.properties);
                 } else {
-                    // Nếu backend trả về sai cấu trúc thì mới quăng lỗi
                     throw new Error("Sai cấu trúc JSON"); 
                 }
             } catch (err) {
@@ -205,10 +203,16 @@ const HomePage = () => {
                                 </div>
                                 {isDropdownOpen && (
                                     <div className="position-absolute end-0 bg-white border rounded shadow mt-2 py-2" style={{width: '180px', zIndex: 110}}>
-                                        <Link to="/profile" className="dropdown-item py-2 d-flex align-items-center text-secondary">
+                                        <div 
+                                            onClick={() => { setIsDropdownOpen(false); setShowProfileModal(true); }} 
+                                            className="dropdown-item py-2 d-flex align-items-center text-secondary" 
+                                            style={{cursor: 'pointer'}}
+                                        >
                                             <User size={16} className="me-2" /> Thông tin cá nhân
-                                        </Link>
+                                        </div>
+                                        
                                         <div className="dropdown-divider my-1"></div>
+                                        
                                         <div onClick={handleLogout} className="dropdown-item py-2 d-flex align-items-center text-danger" style={{cursor: 'pointer'}}>
                                             <LogOut size={16} className="me-2" /> Đăng xuất
                                         </div>
@@ -304,7 +308,6 @@ const HomePage = () => {
                         <div className="row g-4">
                             {latestProperties.map((item) => (
                                 <div key={item.propertyId || item.id} className="col-xl-3 col-lg-4 col-md-6 col-sm-6">
-                                    {/* 🔥 BƯỚC 1: Bọc Link quanh Card để biến nó thành nút bấm */}
                                     <Link to={`/nha-dat-ban/${item.propertyId || item.id}`} className="text-decoration-none text-dark">
                                         <div className="card h-100 shadow-sm border-0 position-relative" style={{ transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                                             <div className="position-relative" style={{height: '180px'}}>
@@ -322,7 +325,6 @@ const HomePage = () => {
                                                 </div>
                                                 <div className="mt-auto d-flex justify-content-between align-items-center pt-3 border-top">
                                                     <span className="text-muted small">Mã: {item.propertyCode}</span>
-                                                    {/* Ngăn chặn sự kiện click lan ra thẻ Link khi bấm nút trái tim */}
                                                     <button className="btn btn-light btn-sm border" onClick={(e) => e.preventDefault()}><Heart size={16} className="text-muted" /></button>
                                                 </div>
                                             </div>
@@ -342,6 +344,10 @@ const HomePage = () => {
                     </>
                 )}
             </section>
+
+            {/* Gọi Component Popup */}
+            <ProfileModal show={showProfileModal} handleClose={() => setShowProfileModal(false)} />
+            
         </div>
     );
 };

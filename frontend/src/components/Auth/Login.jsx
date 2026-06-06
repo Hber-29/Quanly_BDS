@@ -1,48 +1,94 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, ChevronRight } from 'lucide-react';
-import authApi from '../../api/authApi'; // Import tầng API mới
 
 const Login = () => {
     const [credentials, setCredentials] = useState({ username: '', password: '' });
     const [status, setStatus] = useState({ type: '', msg: '' });
     const navigate = useNavigate();
+    const usernameRef = useRef(null);
+    const passwordRef = useRef(null);
+
+    // 🔥 XÓA TOKEN CŨ NHƯNG GIỮ LẠI DỮ LIỆU KHÁC
+    useEffect(() => {
+        // Chỉ xóa token và role, không xóa tất cả
+        localStorage.removeItem('token');
+        localStorage.removeItem('roleId');
+        
+    }, []);
 
     const handleChange = (e) => {
         setCredentials({ ...credentials, [e.target.name]: e.target.value });
+    };
+
+    // Đồng bộ state khi có autofill xảy ra
+    const handleInputBlur = () => {
+        if (usernameRef.current && passwordRef.current) {
+            setCredentials({
+                username: usernameRef.current.value || '',
+                password: passwordRef.current.value || ''
+            });
+        }
     };
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setStatus({ type: 'info', msg: 'Đang kết nối đến hệ thống...' });
 
-        const params = new URLSearchParams();
-        params.append('username', credentials.username);
-        params.append('password', credentials.password);
-
         try {
-            // Dùng qua authApi tập trung đã cấu hình interceptor
-            const data = await authApi.login(params);
+            // 🔥 FORCE-SYNC: Lấy giá trị từ input DOM thay vì dùng state (tránh autofill cũ)
+            const username = usernameRef.current?.value || '';
+            const password = passwordRef.current?.value || '';
 
-            setStatus({ type: 'success', msg: 'Đăng nhập thành công! Đang chuyển hướng...' });
-            localStorage.setItem('accountId', data.accountId); 
-            
-            // axiosClient đã cắt sẵn data, ta chỉ việc bốc dùng
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('roleId', data.roleId); // Lưu thêm roleId để phân quyền giao diện
-            
-            setTimeout(() => {
-                // Tùy theo roleId để điều hướng cho chuẩn
-                if (data.roleId === 1 || data.roleId === 2) {
-                    navigate('/dashboard'); // Admin/Staff vào trang quản trị
-                } else {
-                    navigate('/'); // Customer về trang chủ client
-                }
-            }, 1500);
+            if (!username || !password) {
+                setStatus({ type: 'error', msg: '❌ Vui lòng nhập tên đăng nhập và mật khẩu!' });
+                return;
+            }
+
+            // Gọi API bằng định dạng JSON truyền xuống Backend Java
+            const response = await fetch('http://localhost:8000/api/account/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            // Nếu Backend trả về thành công (200 OK)
+            if (response.ok && data.status === 'success') {
+                setStatus({ type: 'success', msg: 'Đăng nhập thành công! Đang chuyển hướng...' });
+                
+                // Cất "Chìa khóa" mới vào két sắt
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('roleId', data.role); 
+                localStorage.setItem('username', username);
+                localStorage.setItem('accountId', data.accountId || data.id);
+                
+                setTimeout(() => {
+                    const role = parseInt(data.role);
+                    
+                    // 🔥 PHÂN LUỒNG QUYỀN CHUẨN XÁC
+                    if (role === 1 || role === 2) {
+                        // Chỉ cho Role 1 (Admin) và Role 2 (Staff) vào trang quản trị
+                        navigate('/admin/customers'); 
+                    } else {
+                        // Role 3 (Customer) hoặc các role khác thì đẩy ra trang chủ
+                        navigate('/'); 
+                    }
+                }, 1500);
+
+            } else {
+                // Backend trả về lỗi (Ví dụ: 403 Tài khoản bị khóa, 401 Sai pass)
+                setStatus({ type: 'error', msg: `❌ ${data.message}` });
+            }
+
         } catch (error) {
-            // Lấy error message từ bộ chặn interceptor trả ra
-            const errorMsg = error.response?.data?.message || 'Sai tên đăng nhập hoặc lỗi kết nối hệ thống!';
-            setStatus({ type: 'error', msg: errorMsg });
+            setStatus({ type: 'error', msg: '❌ Lỗi kết nối đến máy chủ!' });
         }
     };
 
@@ -50,7 +96,7 @@ const Login = () => {
         <div style={styles.page}>
             <div style={styles.card}>
                 <h2 style={styles.title}>Chào Mừng Trở Lại</h2>
-                <p style={styles.subtitle}>Đăng nhập để quản lý bất động sản của bạn</p>
+                <p style={styles.subtitle}>Đăng nhập để quản lý hệ thống</p>
 
                 {status.msg && (
                     <div style={{
@@ -65,11 +111,32 @@ const Login = () => {
                 <form onSubmit={handleLogin}>
                     <div style={styles.inputBox}>
                         <User size={18} color="#007bff" />
-                        <input name="username" placeholder="Tên đăng nhập" onChange={handleChange} style={styles.input} required />
+                        <input 
+                            ref={usernameRef}
+                            name="username" 
+                            placeholder="Tên đăng nhập" 
+                            value={credentials.username}
+                            onChange={handleChange}
+                            onBlur={handleInputBlur}
+                            style={styles.input} 
+                            required 
+                            autoComplete="new-username"
+                        />
                     </div>
                     <div style={styles.inputBox}>
                         <Lock size={18} color="#007bff" />
-                        <input name="password" type="password" placeholder="Mật khẩu" onChange={handleChange} style={styles.input} required />
+                        <input 
+                            ref={passwordRef}
+                            name="password" 
+                            type="password" 
+                            placeholder="Mật khẩu" 
+                            value={credentials.password}
+                            onChange={handleChange}
+                            onBlur={handleInputBlur}
+                            style={styles.input} 
+                            required 
+                            autoComplete="new-password"
+                        />
                     </div>
                     <button type="submit" style={styles.btn}>Đăng Nhập <ChevronRight size={18} /></button>
                 </form>

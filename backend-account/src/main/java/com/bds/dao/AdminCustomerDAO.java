@@ -50,4 +50,63 @@ public class AdminCustomerDAO {
         }
         return list;
     }
+
+    public boolean updateCustomer(CustomerDTO customer) {
+        // Viết câu SQL cơ bản
+        StringBuilder sql = new StringBuilder("UPDATE customer_info SET full_name = ?, phone = ?, gender = ?, dob = ?, address = ?");
+
+        // Nếu có ảnh gửi lên thì mới Update cột avatar
+        if (customer.getAvatar() != null) {
+            sql.append(", avatar = ?");
+        }
+        sql.append(" WHERE account_id = ?"); // Chốt đuôi câu SQL
+
+        try (Connection conn = DBContext.getWriteConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+
+            ps.setString(1, customer.getFullName());
+            ps.setString(2, customer.getPhone());
+            ps.setString(3, customer.getGender());
+
+            // Xử lý Ngày sinh (Ép kiểu)
+            if (customer.getDob() != null && !customer.getDob().trim().isEmpty()) {
+                ps.setDate(4, java.sql.Date.valueOf(customer.getDob()));
+            } else {
+                ps.setNull(4, java.sql.Types.DATE);
+            }
+
+            ps.setString(5, customer.getAddress());
+
+            int paramIndex = 6;
+            // Nếu có avatar thì gán giá trị vào dấu ? tiếp theo
+            if (customer.getAvatar() != null) {
+                ps.setString(paramIndex++, customer.getAvatar());
+            }
+
+            // Tham số cuối cùng luôn là accountId
+            ps.setInt(paramIndex, customer.getAccountId());
+
+            int rowAffected = ps.executeUpdate();
+            return rowAffected > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    // Hàm Cập nhật trạng thái tài khoản (Khóa / Mở khóa)
+    public boolean updateAccountStatus(int accountId, boolean isActive) {
+        String sql = "UPDATE account SET is_active = ? WHERE account_id = ?";
+        try (Connection conn = DBContext.getWriteConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setBoolean(1, isActive);
+            ps.setInt(2, accountId);
+            return ps.executeUpdate() > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 }

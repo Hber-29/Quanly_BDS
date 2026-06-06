@@ -25,3 +25,10 @@ build/
 *.iml
 .vscode/
 .DS_Store
+
+# Java crash logs
+hs_err_pid*.log
+replay_pid*.log
+
+# PostgreSQL backups
+docker/pg_backups/
