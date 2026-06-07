@@ -1,14 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Search, MapPin, Building, Heart, User, LogOut, Clock, X } from 'lucide-react';
+
+// 🔥 Đã dọn dẹp các icon thừa, chỉ giữ lại đúng những icon trang này đang dùng
+import { Search, MapPin, Building, Heart, User, LogOut, Clock, X, ChevronRight, ChevronDown, Globe } from 'lucide-react';
+
 import propertyApi from '../api/propertyApi';
-import { formatPrice, formatArea, formatUnitPrice } from '../utils/formatPrice';
+import { formatPrice, formatArea } from '../utils/formatPrice';
+import ProfileModal from '../components/Customer/ProfileModal';
 
 const PropertySalePage = () => {
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isVerifiedOnly, setIsVerifiedOnly] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    
+    // STATE QUẢN LÝ MODAL PROFILE
+    const [showProfileModal, setShowProfileModal] = useState(false);
     
     // PHÂN TRANG
     const [currentPage, setCurrentPage] = useState(1);
@@ -23,8 +30,10 @@ const PropertySalePage = () => {
     const [keywordInput, setKeywordInput] = useState(keywordParam);
     const [searchKeyword, setSearchKeyword] = useState(keywordParam);
     
-    // 🛠️ ĐÃ SỬA: Quản lý bộ lọc vùng miền theo Mã số vùng ID thay vì chuỗi text tiếng Việt
+    // CÁC STATE DROPDOWN BỘ LỌC
     const [selectedRegionId, setSelectedRegionId] = useState('');
+    const [selectedPriceRange, setSelectedPriceRange] = useState('');
+    const [selectedAreaRange, setSelectedAreaRange] = useState('');
 
     const [searchHistory, setSearchHistory] = useState(() => {
         const history = localStorage.getItem('search_history');
@@ -83,7 +92,7 @@ const PropertySalePage = () => {
     };
 
     const handleLogout = () => {
-        const isConfirm = window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống BĐS 2026 không?");
+        const isConfirm = window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống BĐS không?");
         if (isConfirm) {
             localStorage.clear();
             window.location.reload();
@@ -119,7 +128,6 @@ const PropertySalePage = () => {
         return () => clearTimeout(delayDebounceFn);
     }, [keywordInput, keywordParam]);
 
-    // 🛠️ ĐÃ SỬA: Truyền selectedRegionId kiểu số nguyên đi làm tham số gợi ý tìm nhanh
     useEffect(() => {
         const fetchSuggestions = async () => {
             if (!keywordInput.trim()) {
@@ -139,7 +147,6 @@ const PropertySalePage = () => {
         fetchSuggestions();
     }, [keywordInput, selectedRegionId]);
 
-    // 🛠️ ĐÃ SỬA: Truyền selectedRegionId kiểu số nguyên vào luồng gọi danh sách bài đăng chính
     useEffect(() => {
         const loadProperties = async () => {
             setLoading(true);
@@ -163,17 +170,63 @@ const PropertySalePage = () => {
             }
         };
         loadProperties();
-    }, [searchKeyword, selectedRegionId, currentPage]);
+    }, [searchKeyword, selectedRegionId, currentPage, selectedPriceRange, selectedAreaRange]); 
 
     const displayedProperties = isVerifiedOnly 
         ? properties.filter(item => item.badge === 'XÁC THỰC') 
         : properties;
 
+    // DỮ LIỆU SIDEBAR BỘ LỌC
+    const priceFilters = [
+        "Thỏa thuận", "Dưới 500 triệu", "500 - 800 triệu", "800 triệu - 1 tỷ", 
+        "1 - 2 tỷ", "2 - 3 tỷ", "3 - 5 tỷ", "5 - 7 tỷ", "7 - 10 tỷ", 
+        "10 - 20 tỷ", "20 - 30 tỷ", "30 - 40 tỷ", "40 - 60 tỷ", "Trên 60 tỷ"
+    ];
+    const areaFilters = [
+        "Dưới 30 m²", "30 - 50 m²", "50 - 80 m²", "80 - 100 m²", 
+        "100 - 150 m²", "150 - 200 m²", "200 - 250 m²", "250 - 300 m²", 
+        "300 - 500 m²", "Trên 500 m²"
+    ];
+
     return (
-        <div className="bg-light min-vh-100 pb-5">
+        <div className="bg-light min-vh-100 d-flex flex-column">
+            <style>
+                {`
+                /* CSS CHO BỘ LỌC SIDEBAR */
+                .filter-sidebar-card { border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+                .filter-sidebar-title { font-size: 16px; font-weight: 700; color: #2C2C2C; margin-bottom: 15px; }
+                .filter-item { font-size: 14px; color: #505050; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; }
+                .filter-item:last-child { border-bottom: none; }
+                .filter-item::before { content: '›'; margin-right: 8px; color: transparent; font-size: 18px; transition: color 0.2s; }
+                .filter-item:hover { color: #dc3545; padding-left: 5px; font-weight: 500; }
+                .filter-item:hover::before { color: #dc3545; }
+                
+                /* LÀM MƯỢT CARD BẤT ĐỘNG SẢN */
+                .property-card { transition: all 0.2s ease-in-out; border: 1px solid #e9ecef; }
+                .property-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; border-color: #dee2e6; }
+
+                /* CSS CHO FOOTER ĐỂ TRÁNH BỊ VỠ GIAO DIỆN */
+                .footer-bg { background-color: #f9f9f9; border-top: 1px solid #e0e0e0; color: #2C2C2C; }
+                .footer-text { font-size: 13px; color: #505050; margin-bottom: 8px; line-height: 1.5; }
+                .footer-title { font-size: 14px; font-weight: 700; color: #2C2C2C; margin-bottom: 15px; text-transform: uppercase; }
+                .footer-link { color: #505050; text-decoration: none; display: block; margin-bottom: 12px; font-size: 13px; transition: color 0.2s;}
+                .footer-link:hover { color: #dc3545; }
+                .contact-top-title { font-size: 12px; color: #999; margin-bottom: 2px;}
+                .contact-top-item { font-size: 14px; color: #2C2C2C; font-weight: 600;}
+                .app-btn { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #2C2C2C; text-decoration: none; display: flex; align-items: center; gap: 8px; transition: 0.2s;}
+                .app-btn:hover { background: #f0f0f0; }
+                .branch-title { font-weight: 600; color: #2C2C2C; font-size: 13px; margin-bottom: 4px; }
+                .branch-text { font-size: 12px; color: #777; line-height: 1.4; margin-bottom: 15px; }
+                .social-icon-box { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background-color: #505050; color: #fff; border-radius: 4px; text-decoration: none; transition: 0.2s;}
+                .social-icon-box:hover { background-color: #dc3545; color: #fff; }
+                .input-newsletter { font-size: 13px; padding: 10px 15px; border-right: none; }
+                .btn-newsletter { background-color: #dc3545; color: white; border: 1px solid #dc3545; padding: 0 15px; }
+                `}
+            </style>
+
             {/* HEADER */}
             <header className="bg-white border-bottom sticky-top shadow-sm z-3">
-                <div className="container-fluid px-4 py-2 d-flex justify-content-between align-items-center">
+                <div className="container-fluid px-4 py-3 d-flex justify-content-between align-items-center">
                     <div className="d-flex align-items-center gap-5">
                         <Link to="/" className="text-decoration-none d-flex align-items-center gap-2 text-dark">
                             <Building size={32} className="text-danger" />
@@ -183,16 +236,19 @@ const PropertySalePage = () => {
                             </div>
                         </Link>
                         <nav className="d-none d-lg-flex gap-4">
-                            {menus.map((item, idx) => (
-                                <Link 
-                                    key={idx} 
-                                    to={item.path} 
-                                    onClick={(e) => handleMenuClick(e, item)}
-                                    className={`text-decoration-none fw-semibold pb-2 pt-2 ${item.isReady ? 'text-danger border-bottom border-danger border-2' : 'text-dark'}`}
-                                >
-                                    {item.name}
-                                </Link>
-                            ))}
+                            {menus.map((item, idx) => {
+                                const isActive = location.pathname === item.path;
+                                return (
+                                    <Link 
+                                        key={idx} 
+                                        to={item.path} 
+                                        onClick={(e) => handleMenuClick(e, item)}
+                                        className={`text-decoration-none fs-6 fw-semibold pb-2 pt-2 ${isActive ? 'text-danger border-bottom border-danger border-3' : 'text-dark hover-danger'}`}
+                                    >
+                                        {item.name}
+                                    </Link>
+                                );
+                            })}
                         </nav>
                     </div>
                     
@@ -206,25 +262,29 @@ const PropertySalePage = () => {
                         ) : (
                             <div className="position-relative" onMouseEnter={() => setIsDropdownOpen(true)} onMouseLeave={() => setIsDropdownOpen(false)}>
                                 <div className="d-flex align-items-center gap-2" style={{cursor: 'pointer'}}>
-                                    <div className="bg-danger rounded-circle d-flex align-items-center justify-content-center text-white" style={{width: '28px', height: '28px'}}>
-                                        <User size={16} />
+                                    <div className="bg-danger rounded-circle d-flex align-items-center justify-content-center text-white shadow-sm" style={{width: '32px', height: '32px'}}>
+                                        <User size={18} />
                                     </div>
                                     <span className="fw-semibold text-dark">Tài khoản</span>
                                 </div>
                                 {isDropdownOpen && (
-                                    <div className="position-absolute end-0 bg-white border rounded shadow mt-2 py-2" style={{width: '180px', zIndex: 110}}>
-                                        <Link to="/profile" className="dropdown-item py-2 d-flex align-items-center text-secondary">
-                                            <User size={16} className="me-2" /> Thông tin cá nhân
-                                        </Link>
+                                    <div className="position-absolute end-0 bg-white border rounded-3 shadow-lg mt-2 py-2" style={{width: '200px', zIndex: 110}}>
+                                        <div 
+                                            onClick={() => { setIsDropdownOpen(false); setShowProfileModal(true); }} 
+                                            className="dropdown-item py-2 px-3 d-flex align-items-center text-secondary fw-semibold" 
+                                            style={{cursor: 'pointer', transition: '0.2s'}}
+                                        >
+                                            <User size={18} className="me-3 text-dark" /> Thông tin cá nhân
+                                        </div>
                                         <div className="dropdown-divider my-1"></div>
-                                        <div onClick={handleLogout} className="dropdown-item py-2 d-flex align-items-center text-danger" style={{cursor: 'pointer'}}>
-                                            <LogOut size={16} className="me-2" /> Đăng xuất
+                                        <div onClick={handleLogout} className="dropdown-item py-2 px-3 d-flex align-items-center text-danger fw-semibold" style={{cursor: 'pointer', transition: '0.2s'}}>
+                                            <LogOut size={18} className="me-3" /> Đăng xuất
                                         </div>
                                     </div>
                                 )}
                             </div>
                         )}
-                        <Link to={isLoggedIn ? "/dang-tin" : "/login"} className="btn btn-outline-dark fw-bold ms-2 px-3 py-2 rounded">Đăng tin</Link>
+                        <Link to={isLoggedIn ? "/dang-tin" : "/login"} className="btn btn-outline-dark fw-bold ms-3 px-4 py-2 rounded-3">Đăng tin</Link>
                     </div>
                 </div>
             </header>
@@ -234,23 +294,24 @@ const PropertySalePage = () => {
                 <div className="container d-flex flex-wrap align-items-center gap-3">
                     
                     <div className="flex-grow-1 position-relative" style={{minWidth: '300px'}} ref={searchRef}>
-                        <div className="input-group border rounded">
-                            <span className="input-group-text bg-white border-0"><Search size={16} className="text-muted" /></span>
+                        <div className="input-group border border-secondary-subtle rounded-3 overflow-hidden">
+                            <span className="input-group-text bg-white border-0"><Search size={18} className="text-muted" /></span>
                             <input 
                                 type="text" 
                                 className="form-control border-0 shadow-none px-2 py-2"
                                 value={keywordInput} 
                                 onChange={(e) => setKeywordInput(e.target.value)}
                                 onFocus={() => setShowSuggestions(true)}
-                                placeholder="Gõ tiêu đề hoặc mã bài đăng..." 
+                                placeholder="Gõ tiêu đề, khu vực hoặc mã bài đăng..." 
                             />
                             {keywordInput && (
                                 <span className="input-group-text bg-white border-0" style={{cursor: 'pointer'}} onClick={() => setKeywordInput('')}>
-                                    <X size={16} className="text-muted" />
+                                    <X size={18} className="text-muted" />
                                 </span>
                             )}
                         </div>
                         
+                        {/* Box Gợi ý */}
                         {showSuggestions && (
                             <div className="position-absolute start-0 w-100 bg-white border rounded shadow mt-1" style={{zIndex: 999, maxHeight: '280px', overflowY: 'auto'}}>
                                 {!keywordInput.trim() ? (
@@ -296,16 +357,13 @@ const PropertySalePage = () => {
                         )}
                     </div>
                     
-                    {/* 🛠️ ĐÃ SỬA: Map value option chuẩn xác theo mã ID vùng miền trong Database của bạn */}
-                    {/* BỘ LỌC VÙNG MIỀN - FULL 63 TỈNH THÀNH (Chuẩn DB) */}
+                    {/* BỘ LỌC VÙNG MIỀN */}
                     <select 
-                        className="form-select w-auto shadow-none"
+                        className="form-select w-auto shadow-none border-secondary-subtle rounded-3 py-2 text-dark fw-semibold"
                         value={selectedRegionId}
                         onChange={(e) => { setSelectedRegionId(e.target.value); setCurrentPage(1); }}
                     >
                         <option value="">Khu vực (Toàn quốc)</option>
-                        
-                        {/* Miền Bắc */}
                         <option value="1">Thành phố Hà Nội</option>
                         <option value="2">Tỉnh Hà Giang</option>
                         <option value="4">Tỉnh Cao Bằng</option>
@@ -331,8 +389,6 @@ const PropertySalePage = () => {
                         <option value="35">Tỉnh Hà Nam</option>
                         <option value="36">Tỉnh Nam Định</option>
                         <option value="37">Tỉnh Ninh Bình</option>
-
-                        {/* Miền Trung & Tây Nguyên */}
                         <option value="38">Tỉnh Thanh Hóa</option>
                         <option value="40">Tỉnh Nghệ An</option>
                         <option value="42">Tỉnh Hà Tĩnh</option>
@@ -352,8 +408,6 @@ const PropertySalePage = () => {
                         <option value="66">Tỉnh Đắk Lắk</option>
                         <option value="67">Tỉnh Đắk Nông</option>
                         <option value="68">Tỉnh Lâm Đồng</option>
-
-                        {/* Miền Nam */}
                         <option value="70">Tỉnh Bình Phước</option>
                         <option value="72">Tỉnh Tây Ninh</option>
                         <option value="74">Tỉnh Bình Dương</option>
@@ -375,74 +429,120 @@ const PropertySalePage = () => {
                         <option value="96">Tỉnh Cà Mau</option>
                     </select>
 
-                    <select className="form-select w-auto shadow-none"><option>Khoảng giá</option></select>
-                    <select className="form-select w-auto shadow-none"><option>Diện tích</option></select>
+                    <select 
+                        className="form-select w-auto shadow-none border-secondary-subtle rounded-3 py-2 text-dark fw-semibold"
+                        value={selectedPriceRange}
+                        onChange={(e) => { setSelectedPriceRange(e.target.value); setCurrentPage(1); }}
+                    >
+                        <option value="">Mức giá</option>
+                        <option value="Thỏa thuận">Thỏa thuận</option>
+                        <option value="Dưới 500 triệu">Dưới 500 triệu</option>
+                        <option value="500 - 800 triệu">500 - 800 triệu</option>
+                        <option value="800 triệu - 1 tỷ">800 triệu - 1 tỷ</option>
+                        <option value="1 - 2 tỷ">1 - 2 tỷ</option>
+                        <option value="2 - 3 tỷ">2 - 3 tỷ</option>
+                        <option value="3 - 5 tỷ">3 - 5 tỷ</option>
+                        <option value="5 - 7 tỷ">5 - 7 tỷ</option>
+                        <option value="7 - 10 tỷ">7 - 10 tỷ</option>
+                        <option value="10 - 20 tỷ">10 - 20 tỷ</option>
+                        <option value="20 - 30 tỷ">20 - 30 tỷ</option>
+                        <option value="Trên 30 tỷ">Trên 30 tỷ</option>
+                    </select>
 
+                    <select 
+                        className="form-select w-auto shadow-none border-secondary-subtle rounded-3 py-2 text-dark fw-semibold"
+                        value={selectedAreaRange}
+                        onChange={(e) => { setSelectedAreaRange(e.target.value); setCurrentPage(1); }}
+                    >
+                        <option value="">Diện tích</option>
+                        <option value="Dưới 30 m²">Dưới 30 m²</option>
+                        <option value="30 - 50 m²">30 - 50 m²</option>
+                        <option value="50 - 80 m²">50 - 80 m²</option>
+                        <option value="80 - 100 m²">80 - 100 m²</option>
+                        <option value="100 - 150 m²">100 - 150 m²</option>
+                        <option value="150 - 200 m²">150 - 200 m²</option>
+                        <option value="200 - 250 m²">200 - 250 m²</option>
+                        <option value="250 - 300 m²">250 - 300 m²</option>
+                        <option value="300 - 500 m²">300 - 500 m²</option>
+                        <option value="Trên 500 m²">Trên 500 m²</option>
+                    </select>
+
+                    {/* SWITCH TIN XÁC THỰC */}
                     <div 
-                        className="d-flex align-items-center border rounded px-3 py-2 bg-white"
-                        style={{ cursor: 'pointer', userSelect: 'none', borderColor: isVerifiedOnly ? '#28a745' : '#ddd' }}
+                        className="d-flex align-items-center border rounded-3 px-3 py-2 bg-white ms-auto"
+                        style={{ cursor: 'pointer', userSelect: 'none', borderColor: isVerifiedOnly ? '#28a745' : '#ddd', transition: '0.2s' }}
                         onClick={() => setIsVerifiedOnly(!isVerifiedOnly)}
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isVerifiedOnly ? '#28a745' : '#666'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="me-2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isVerifiedOnly ? '#28a745' : '#6c757d'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="me-2">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                             <polyline points="22 4 12 14.01 9 11.01"></polyline>
                         </svg>
-                        <span className="fw-semibold me-2 small" style={{color: isVerifiedOnly ? '#28a745' : '#555'}}>Tin xác thực</span>
-                        <div className="rounded-pill d-flex align-items-center p-1" style={{ width: '30px', height: '16px', backgroundColor: isVerifiedOnly ? '#28a745' : '#ccc', transition: 'all 0.3s' }}>
-                            <div className="bg-white rounded-circle shadow-sm" style={{ width: '12px', height: '12px', transform: isVerifiedOnly ? 'translateX(14px)' : 'translateX(0px)', transition: 'transform 0.3s' }} />
+                        <span className="fw-bold me-3 small" style={{color: isVerifiedOnly ? '#28a745' : '#495057'}}>Tin xác thực</span>
+                        <div className="rounded-pill d-flex align-items-center p-1" style={{ width: '36px', height: '20px', backgroundColor: isVerifiedOnly ? '#28a745' : '#e9ecef', transition: 'all 0.3s' }}>
+                            <div className="bg-white rounded-circle shadow-sm" style={{ width: '14px', height: '14px', transform: isVerifiedOnly ? 'translateX(16px)' : 'translateX(0px)', transition: 'transform 0.3s' }} />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* PRODUCT GRID */}
-            <div className="container">
+            {/* PRODUCT GRID & SIDEBAR */}
+            <div className="container mt-4 flex-grow-1">
                 <div className="row">
-                    <div className="col-lg-9">
-                        <h2 className="fw-bold mb-2">Mua bán nhà đất trên toàn quốc</h2>
-                        <p className="small fw-semibold mb-4 text-dark">
-                            Tìm thấy <strong className="text-danger">{displayedProperties.length}</strong> bất động sản phù hợp.
+                    
+                    {/* CỘT TRÁI: DANH SÁCH BĐS (Chiếm 9 phần) */}
+                    <div className="col-lg-9 pe-lg-4">
+                        <h2 className="fw-bold mb-1 text-dark" style={{letterSpacing: '-0.5px'}}>Mua bán nhà đất trên toàn quốc</h2>
+                        <p className="fw-semibold mb-4 text-secondary" style={{fontSize: '15px'}}>
+                            Hiện có <strong className="text-danger">{displayedProperties.length}</strong> bất động sản phù hợp.
                         </p>
 
                         {loading ? (
-                            <div className="text-center py-5 text-muted">Đang tìm kiếm bài đăng...</div>
+                            <div className="text-center py-5 text-muted">
+                                <div className="spinner-border text-danger mb-2" role="status"></div>
+                                <div>Đang tìm kiếm bài đăng...</div>
+                            </div>
                         ) : displayedProperties.length > 0 ? (
                             displayedProperties.map((item) => (
                                 <Link to={`/nha-dat-ban/${item.propertyId || item.id}`} key={item.propertyId || item.id} className="text-decoration-none text-dark d-block mb-4">
-                                    <div className="card flex-row border border-light-subtle rounded shadow-sm bg-white p-3" style={{ transition: 'box-shadow 0.2s', cursor: 'pointer' }} onMouseOver={(e) => e.currentTarget.classList.add('shadow')} onMouseOut={(e) => e.currentTarget.classList.remove('shadow')}>
-                                        <img src={item.thumbnail} alt={item.title} className="rounded object-fit-cover" style={{width: '240px', height: '160px'}} />
-                                        <div className="card-body d-flex flex-column py-0 pe-0">
+                                    <div className="card flex-row property-card rounded-3 shadow-sm bg-white p-3">
+                                        <img src={item.thumbnail} alt={item.title} className="rounded-3 object-fit-cover" style={{width: '260px', height: '175px'}} />
+                                        <div className="card-body d-flex flex-column py-1 pe-1 ms-3">
                                             <div className="mb-2">
-                                                <span className="badge fw-bold" style={{ fontSize: '11px', color: item.badge === 'XÁC THỰC' ? '#28a745' : '#e03c31', backgroundColor: 'transparent', padding: 0 }}>
-                                                    {item.badge === 'XÁC THỰC' ? 'TIN ĐÃ XÁC THỰC' : 'VIP KIM CƯƠNG'}
+                                                <span className="badge fw-bold" style={{ fontSize: '11px', color: item.badge === 'XÁC THỰC' ? '#28a745' : '#e03c31', backgroundColor: item.badge === 'XÁC THỰC' ? 'rgba(40, 167, 69, 0.1)' : 'rgba(224, 60, 49, 0.1)', padding: '5px 8px', letterSpacing: '0.5px' }}>
+                                                    {item.badge === 'XÁC THỰC' ? '✓ TIN XÁC THỰC' : '★ VIP KIM CƯƠNG'}
                                                 </span>
                                             </div>
-                                            <h5 className="card-title fw-bold text-dark fs-6 mb-3 lh-base">{item.title}</h5>
-                                            <div className="d-flex align-items-center gap-3 mb-2">
-                                                <span className="fw-bold text-danger">{formatPrice(item.price)}</span>
-                                                <span className="fw-bold text-danger">{formatArea(item.area)} m²</span>
-                                                <span className="small text-muted d-flex align-items-center gap-1"><MapPin size={12} /> {item.address}</span>
+                                            <h5 className="card-title fw-bold text-dark mb-2 lh-base" style={{fontSize: '17px'}}>{item.title}</h5>
+                                            <div className="d-flex align-items-center gap-4 mb-2">
+                                                <span className="fw-bold text-danger fs-5">{formatPrice(item.price)}</span>
+                                                <span className="fw-bold text-danger fs-6">{formatArea(item.area)} m²</span>
                                             </div>
-                                            <p className="card-text small text-secondary mb-3" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>{item.description}</p>
-                                            <div className="mt-auto d-flex justify-content-between align-items-center">
-                                                <span className="small text-muted" style={{ fontSize: '12px' }}>Mã: {item.propertyCode}</span>
-                                                <button className="btn btn-light border p-1" onClick={(e) => e.preventDefault()}><Heart size={16} /></button>
+                                            <div className="small text-secondary mb-3 d-flex align-items-center gap-1">
+                                                <MapPin size={14} className="text-muted"/> {item.address}
+                                            </div>
+                                            <p className="card-text text-muted mb-3" style={{fontSize: '14px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>{item.description}</p>
+                                            <div className="mt-auto d-flex justify-content-between align-items-center border-top pt-3">
+                                                <span className="text-muted fw-semibold" style={{ fontSize: '12px' }}>Mã tin: {item.propertyCode}</span>
+                                                <button className="btn btn-light border rounded-circle p-2" onClick={(e) => e.preventDefault()}><Heart size={16} className="text-secondary" /></button>
                                             </div>
                                         </div>
                                     </div>
                                 </Link>
                             ))
                         ) : (
-                            <div className="alert alert-light border border-dashed text-center py-5 text-secondary small">Không tìm thấy bài đăng nào khớp với điều kiện tìm kiếm của bạn.</div>
+                            <div className="alert alert-light border border-dashed text-center py-5 text-secondary">
+                                <Search size={40} className="text-muted mb-3 opacity-50" /><br/>
+                                Không tìm thấy bài đăng nào khớp với điều kiện tìm kiếm của bạn.
+                            </div>
                         )}
 
                         {/* THANH PHÂN TRANG */}
                         {!loading && totalPages > 1 && (
-                            <div className="d-flex justify-content-center mt-4 mb-5 gap-2">
+                            <div className="d-flex justify-content-center mt-5 mb-5 gap-2">
                                 <button 
                                     onClick={() => handlePageChange(currentPage - 1)} 
                                     disabled={currentPage === 1}
-                                    className="btn btn-outline-secondary fw-semibold small px-3 py-2"
+                                    className="btn btn-outline-secondary fw-semibold px-3 py-2"
                                     style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
                                 >
                                     &laquo; Trước
@@ -452,7 +552,7 @@ const PropertySalePage = () => {
                                     <button 
                                         key={index}
                                         onClick={() => handlePageChange(index + 1)}
-                                        className={`btn fw-semibold small px-3 py-2 ${currentPage === index + 1 ? 'btn-danger' : 'btn-outline-secondary bg-white text-dark'}`}
+                                        className={`btn fw-bold px-3 py-2 ${currentPage === index + 1 ? 'btn-danger' : 'btn-outline-secondary bg-white text-dark'}`}
                                     >
                                         {index + 1}
                                     </button>
@@ -461,7 +561,7 @@ const PropertySalePage = () => {
                                 <button 
                                     onClick={() => handlePageChange(currentPage + 1)} 
                                     disabled={currentPage === totalPages}
-                                    className="btn btn-outline-secondary fw-semibold small px-3 py-2"
+                                    className="btn btn-outline-secondary fw-semibold px-3 py-2"
                                     style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
                                 >
                                     Sau &raquo;
@@ -470,19 +570,178 @@ const PropertySalePage = () => {
                         )}
                     </div>
 
+                    {/* CỘT PHẢI: SIDEBAR BỘ LỌC */}
                     <div className="col-lg-3">
-                        <div className="card border border-light-subtle rounded shadow-sm bg-white p-3 mb-4">
-                            <h6 className="fw-bold text-dark mb-3" style={{ fontSize: '14px' }}>Lọc theo khoảng giá</h6>
-                            <ul className="list-unstyled mb-0 d-flex flex-column gap-2 small text-secondary" style={{ cursor: 'pointer' }}>
-                                <li>Thỏa thuận</li>
-                                <li>Dưới 500 triệu</li>
-                                <li>500 - 800 triệu</li>
-                                <li>1 - 2 tỷ</li>
-                            </ul>
+                        <div className="filter-sidebar-card mb-4">
+                            <h6 className="filter-sidebar-title">Lọc theo khoảng giá</h6>
+                            <div className="d-flex flex-column">
+                                {priceFilters.map((filter, index) => (
+                                    <div key={index} className="filter-item" onClick={() => { setSelectedPriceRange(filter); setCurrentPage(1); }}>{filter}</div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="filter-sidebar-card">
+                            <h6 className="filter-sidebar-title">Lọc theo diện tích</h6>
+                            <div className="d-flex flex-column">
+                                {areaFilters.map((filter, index) => (
+                                    <div key={index} className="filter-item" onClick={() => { setSelectedAreaRange(filter); setCurrentPage(1); }}>{filter}</div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            {/* SIÊU FOOTER HOÀN MỸ */}
+            <footer className="footer-bg pt-5 mt-5">
+                <div className="container pb-4">
+                    
+                    {/* HÀNG 1: THÔNG TIN LIÊN HỆ NHANH */}
+                    <div className="row pb-4 border-bottom border-light-subtle mb-4 align-items-center">
+                        <div className="col-lg-3 col-md-12 mb-4 mb-lg-0">
+                            <div className="d-flex align-items-center gap-2">
+                                <Building size={40} className="text-dark" />
+                                <div>
+                                    <span className="fs-3 fw-bold text-dark d-block" style={{letterSpacing: '-0.5px', lineHeight: '1'}}>Batdongsan</span>
+                                    <span className="small fw-semibold text-muted">by PropertyGuru</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-lg-3 col-md-4 mb-3 mb-md-0 d-flex gap-3 align-items-center">
+                            <i className="bi bi-telephone text-secondary" style={{fontSize: '32px'}}></i>
+                            <div>
+                                <div className="contact-top-title">Hotline</div>
+                                <div className="contact-top-item">1900 1881</div>
+                            </div>
+                        </div>
+                        <div className="col-lg-3 col-md-4 mb-3 mb-md-0 d-flex gap-3 align-items-center">
+                            <i className="bi bi-person-badge text-secondary" style={{fontSize: '32px'}}></i>
+                            <div>
+                                <div className="contact-top-title">Hỗ trợ khách hàng</div>
+                                <div className="contact-top-item">trogiup.batdongsan.com.vn</div>
+                            </div>
+                        </div>
+                        <div className="col-lg-3 col-md-4 d-flex gap-3 align-items-center">
+                            <i className="bi bi-headset text-secondary" style={{fontSize: '32px'}}></i>
+                            <div>
+                                <div className="contact-top-title">Chăm sóc khách hàng</div>
+                                <div className="contact-top-item">hotro@batdongsan.com.vn</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* HÀNG 2: 4 CỘT MENU CHÍNH */}
+                    <div className="row g-4 pb-2">
+                        <div className="col-lg-4 col-md-6 pe-lg-4">
+                            <h6 className="footer-title">CÔNG TY CỔ PHẦN PROPERTYGURU VIỆT NAM</h6>
+                            <div className="footer-text d-flex align-items-start mt-3">
+                                <i className="bi bi-geo-alt me-2 mt-1 fs-5 text-secondary"></i>
+                                <span>Tầng 31, Keangnam Hanoi Landmark Tower, Phường Yên Hòa, Quận Cầu Giấy, TP. Hà Nội</span>
+                            </div>
+                            <div className="footer-text d-flex align-items-center mt-2 mb-4">
+                                <i className="bi bi-telephone me-2 fs-5 text-secondary"></i>
+                                <span>(024) 3562 5939 - (024) 3562 5940</span>
+                            </div>
+                            
+                            <div className="d-flex align-items-center gap-3">
+                                <div className="bg-white p-1 rounded border shadow-sm">
+                                    <i className="bi bi-qr-code" style={{fontSize: '3.5rem', lineHeight:'1'}}></i>
+                                </div>
+                                <div className="d-flex flex-column gap-2">
+                                    <a href="#" className="app-btn"><i className="bi bi-google-play text-success fs-5"></i> Google Play</a>
+                                    <a href="#" className="app-btn"><i className="bi bi-apple fs-5"></i> App Store</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="col-lg-2 col-md-6">
+                            <h6 className="footer-title">HƯỚNG DẪN</h6>
+                            <a href="#" className="footer-link">Về chúng tôi</a>
+                            <a href="#" className="footer-link">Báo giá và hỗ trợ</a>
+                            <a href="#" className="footer-link">Câu hỏi thường gặp</a>
+                            <a href="#" className="footer-link">Góp ý báo lỗi</a>
+                            <a href="#" className="footer-link">Sitemap</a>
+                        </div>
+
+                        <div className="col-lg-2 col-md-6">
+                            <h6 className="footer-title">QUY ĐỊNH</h6>
+                            <a href="#" className="footer-link">Quy định đăng tin</a>
+                            <a href="#" className="footer-link">Quy chế hoạt động</a>
+                            <a href="#" className="footer-link">Điều khoản thỏa thuận</a>
+                            <a href="#" className="footer-link">Chính sách bảo mật</a>
+                            <a href="#" className="footer-link">Giải quyết khiếu nại</a>
+                        </div>
+
+                        <div className="col-lg-4 col-md-6">
+                            <h6 className="footer-title">ĐĂNG KÝ NHẬN TIN</h6>
+                            <div className="input-group mb-4">
+                                <input type="email" className="form-control input-newsletter border-secondary-subtle" placeholder="Nhập email của bạn" />
+                                <button className="btn btn-newsletter"><i className="bi bi-send-fill"></i></button>
+                            </div>
+                            <h6 className="footer-title mb-2">QUỐC GIA & NGÔN NGỮ</h6>
+                            <div className="position-relative d-inline-block" style={{width: '200px'}}>
+                                <Globe size={16} className="position-absolute top-50 translate-middle-y ms-3 text-secondary" />
+                                <select className="form-select bg-white border-secondary-subtle py-2 ps-5 text-dark fw-semibold" style={{fontSize:'13px', cursor: 'pointer'}}>
+                                    <option>Việt Nam</option>
+                                    <option>English</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* HÀNG 3: CHI NHÁNH */}
+                    <div className="border-top border-light-subtle pt-4 mt-4 mb-4">
+                        <div className="d-flex align-items-center gap-2 mb-3 cursor-pointer" style={{color: '#2C2C2C'}}>
+                            <ChevronDown size={18} /> <span className="fw-semibold" style={{fontSize: '13px'}}>Xem chi nhánh của Batdongsan.com.vn</span>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-4">
+                                <div className="branch-title">Chi nhánh TP. Hồ Chí Minh</div>
+                                <div className="branch-text">Tầng 2, 3, Tháp B Tòa nhà Viettel, 285 Cách Mạng Tháng Tám, Phường Hòa Thạnh, Thành phố Hồ Chí Minh, Việt Nam<br/>Hotline: 1900 1881</div>
+                                <div className="branch-title">Chi nhánh Đà Nẵng</div>
+                                <div className="branch-text">Tầng 9 Vĩnh Trung Plaza, 255-257 Hùng Vương, Phường Thanh Khê, Thành phố Đà Nẵng, Việt Nam<br/>Hotline: 1900 1881</div>
+                            </div>
+                            <div className="col-md-4">
+                                <div className="branch-title">Chi nhánh Hải Phòng</div>
+                                <div className="branch-text">Phòng 502, tầng số 5 tòa nhà TD Business Center, Lô 20A, đường Lê Hồng Phong, Phường Gia Viên, Thành phố Hải Phòng, Việt Nam<br/>Hotline: 1900 1881</div>
+                                <div className="branch-title">Chi nhánh Vũng Tàu</div>
+                                <div className="branch-text">Số P.F4-01 lầu 4 tòa nhà ACB chi nhánh Vũng Tàu, số 111 Hoàng Hoa Thám, Phường Vũng Tàu, Thành phố Hồ Chí Minh, Việt Nam<br/>Hotline: 1900 1881</div>
+                            </div>
+                            <div className="col-md-4">
+                                <div className="branch-title">Chi nhánh Bình Dương</div>
+                                <div className="branch-text">Tầng 05, Tòa nhà Biconsi Tower, số 01 đường Phú Lợi, Phường Phú Lợi, Thành phố Hồ Chí Minh, Việt Nam<br/>Hotline: 1900 1881</div>
+                                <div className="branch-title">Chi nhánh Nha Trang</div>
+                                <div className="branch-text">11 Lý Thánh Tôn, Phường Nha Trang, Tỉnh Khánh Hòa, Việt Nam<br/>Hotline: 1900 1881</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* HÀNG 4: BẢN QUYỀN & MẠNG XÃ HỘI */}
+                    <div className="border-top border-light-subtle pt-4 d-flex flex-column flex-xl-row justify-content-between align-items-start gap-4">
+                        <div style={{maxWidth: '400px'}}>
+                            <p className="footer-text mb-1">Copyright © 2007 - 2026 Batdongsan.com.vn</p>
+                            <p className="footer-text mb-0">Giấy ĐKKD số 0104630479 do Sở KHĐT TP Hà Nội cấp lần đầu ngày 02/06/2010. Người đại diện theo pháp luật: Ông Bạch Dương</p>
+                        </div>
+                        <div style={{maxWidth: '400px'}}>
+                            <p className="footer-text mb-0">Chịu trách nhiệm sản phẩm: Ông Bạch Dương<br/>Quy chế, quy định giao dịch có hiệu lực từ 08/08/2023<br/>Ghi rõ nguồn "Batdongsan.com.vn" khi phát hành lại thông tin từ website này.</p>
+                        </div>
+                        <div className="d-flex align-items-center gap-4">
+                            <span className="badge bg-danger p-2 px-3 fw-bold shadow-sm d-flex align-items-center gap-1" style={{fontSize:'12px', border: '1px solid #c92a2a'}}>
+                                <i className="bi bi-check-circle-fill"></i> ĐÃ ĐĂNG KÝ<br/>BỘ CÔNG THƯƠNG
+                            </span>
+                            <div className="d-flex gap-2">
+                                <a href="#" className="social-icon-box"><i className="bi bi-facebook fs-6"></i></a>
+                                <a href="#" className="social-icon-box"><i className="bi bi-youtube fs-6"></i></a>
+                                <a href="#" className="social-icon-box"><i className="bi bi-chat-dots-fill fs-6"></i></a>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </footer>
+
+            <ProfileModal show={showProfileModal} handleClose={() => setShowProfileModal(false)} />
         </div>
     );
 };
