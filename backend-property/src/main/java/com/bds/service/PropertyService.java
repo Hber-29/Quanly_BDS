@@ -15,20 +15,20 @@ public class PropertyService {
     private PropertyDAO propertyDAO = new PropertyDAO();
     private Gson gson = new Gson();
 
-    // 🌟 HÀM GIỮ NGUYÊN 100% THEO FILE CŨ CỦA BẠN
+
     public PropertyPageResponse getPropertyList(int page, int pageSize) {
         String cacheKey = "properties_page_" + page + "_limit_" + pageSize;
         try (Jedis jedis = new Jedis("localhost", 6379)) {
             String cachedData = jedis.get(cacheKey);
             if (cachedData != null) {
-                System.out.println("⚡ Lấy dữ liệu siêu tốc từ Redis Cache (Key: " + cacheKey + ")!");
+                System.out.println(" Lấy dữ liệu siêu tốc từ Redis Cache (Key: " + cacheKey + ")!");
                 return gson.fromJson(cachedData, PropertyPageResponse.class);
             }
         } catch (Exception e) {
             System.out.println("Lỗi kết nối Redis: " + e.getMessage());
         }
 
-        System.out.println("🐢 Cache trống, đang lấy dữ liệu từ Database Replica (Key: " + cacheKey + ")...");
+        System.out.println(" Cache trống, đang lấy dữ liệu từ Database Replica (Key: " + cacheKey + ")...");
         List<Property> list = propertyDAO.getPropertiesByPage(page, pageSize);
         int totalItems = propertyDAO.getTotalPropertiesCount();
         int totalPages = (int) Math.ceil((double) totalItems / pageSize);
@@ -47,7 +47,7 @@ public class PropertyService {
         return responseObj;
     }
 
-    // 🛠️ HÀM ĐÃ ĐƯỢC NÂNG CẤP: Chuyển đổi tham số vùng miền sang định dạng Số nguyên để map chuẩn với DAO
+    //  Chuyển đổi tham số vùng miền sang định dạng Số nguyên để map chuẩn với DAO
     public PropertyPageResponse searchPropertyList(String keyword, int regionId, int page, int pageSize) {
         String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim().replaceAll("\\s+", "_") : "all";
 
@@ -93,7 +93,7 @@ public class PropertyService {
         return responseObj;
     }
 
-    // 🌟 HÀM GIỮ NGUYÊN 100% THEO FILE CŨ CỦA BẠN
+
     public boolean createProperty(Property newProperty, List<String> images) {
         if (newProperty.getTitle() == null || newProperty.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Tiêu đề không được để trống");
@@ -123,7 +123,7 @@ public class PropertyService {
         return isSuccess;
     }
 
-    // 🌟 HÀM GIỮ NGUYÊN 100% THEO FILE CŨ CỦA BẠN
+
     public PropertyDetailDTO getPropertyDetail(int propertyId) {
         Property p = propertyDAO.getPropertyDetailById(propertyId);
         if (p == null) return null;

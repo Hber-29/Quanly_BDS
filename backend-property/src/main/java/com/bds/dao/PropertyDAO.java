@@ -71,7 +71,7 @@ public class PropertyDAO {
         return count;
     }
 
-    // 🛠️ HÀM ĐÃ ĐƯỢC NÂNG CẤP: Tìm kiếm đa điều kiện Text + region_id số nguyên
+    //  HÀM ĐÃ ĐƯỢC NÂNG CẤP: Tìm kiếm đa điều kiện Text + region_id số nguyên
     // 1. Hàm tìm kiếm danh sách bài đăng (ĐÃ THÊM TÌM THEO ĐỊA CHỈ)
     public List<Property> searchProperties(String keyword, Integer regionId, int page, int pageSize) {
         List<Property> list = new ArrayList<>();
@@ -93,7 +93,7 @@ public class PropertyDAO {
             int idx = 1;
             ps.setString(idx++, searchKeyword); // Truyền cho title
             ps.setString(idx++, searchKeyword); // Truyền cho property_code
-            ps.setString(idx++, searchKeyword); // 🌟 Truyền cho address (Dòng mới thêm)
+            ps.setString(idx++, searchKeyword); // Truyền cho address (Dòng mới thêm)
 
             if (regionId != null && regionId > 0) {
                 ps.setInt(idx++, regionId);
@@ -143,7 +143,7 @@ public class PropertyDAO {
             int idx = 1;
             ps.setString(idx++, searchKeyword);
             ps.setString(idx++, searchKeyword);
-            ps.setString(idx++, searchKeyword); // 🌟 Dòng mới thêm
+            ps.setString(idx++, searchKeyword); 
 
             if (regionId != null && regionId > 0) {
                 ps.setInt(idx++, regionId);

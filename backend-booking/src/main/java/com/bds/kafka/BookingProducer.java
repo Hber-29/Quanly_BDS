@@ -27,7 +27,7 @@ public class BookingProducer {
      * Hàm dùng để gửi tin nhắn đặt chỗ vào Topic
      */
     public static void sendBookingMessage(String propertyId, String messageJson) {
-        // 🔥 BÍ QUYẾT RACE CONDITION:
+        //  BÍ QUYẾT RACE CONDITION:
         // Đặt 'propertyId' làm KAFKA KEY. Kafka sẽ ép tất cả tin nhắn có chung Key
         // phải đi chung 1 làn đường (Partition) và xếp hàng nối đuôi nhau tuyệt đối!
         ProducerRecord<String, String> record = new ProducerRecord<>(
